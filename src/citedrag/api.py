@@ -1,16 +1,22 @@
 """FastAPI service and web UI.
 
 GET  /              web interface
-POST /ask           cited answer for a question
-GET  /documents     indexed documents
-POST /upload        add .md/.txt/.pdf files and re-index
-GET  /examples      sample questions from the golden set
-GET  /eval          retrieval metrics on the golden set (no model calls)
+GET  /documents     built-in sample documents
+POST /parse         turn uploaded files into chunks (nothing is stored on the server)
+POST /ask           cited answer, searching selected sample docs + the user's own uploaded chunks
+GET  /examples      sample questions
+GET  /eval          retrieval accuracy on the golden question set (no model calls)
+
+Uploaded documents are never saved on the server. /parse returns their chunks
+to the browser, which keeps them for the session and sends them with each
+question. That keeps every visitor's documents private to them and works on
+serverless hosts like Vercel, where server memory and disk don't persist.
 """
 
 from __future__ import annotations
 
 import re
+import tempfile
 import threading
 import time
 from collections import defaultdict, deque
@@ -24,17 +30,38 @@ from pydantic import BaseModel, Field
 from .config import ON_VERCEL, settings
 from .evaluate import load_golden, run_eval
 from .generate import has_api_key, respond
-from .ingest import ingest_folder, load_index, save_index
+from .ingest import Chunk, ingest_folder, load_document, load_index
 from .retrieve import Retriever
 
 STATIC = Path(__file__).parent / "static"
 ALLOWED = {".md", ".txt", ".pdf"}
-MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+# Vercel rejects request bodies over 4.5 MB, so keep uploads (and the chunks sent back) under that.
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024
+MAX_USER_CHUNKS = 3000
+MAX_CHUNK_CHARS = 4000
 
-app = FastAPI(title="citedrag", version="0.1.0")
+app = FastAPI(title="citedrag", version="0.2.0")
 _lock = threading.Lock()
-_retriever: Retriever | None = None
+_base: Retriever | None = None
 _asks: dict[str, deque] = defaultdict(deque)
+
+
+class ChunkIn(BaseModel):
+    chunk_id: str = Field(max_length=300)
+    doc_id: str = Field(max_length=200)
+    title: str = Field(max_length=300)
+    section: str = Field(default="", max_length=300)
+    page: int = 0
+    text: str = Field(max_length=MAX_CHUNK_CHARS)
+    tags: dict[str, str] = Field(default_factory=dict)
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=2000)
+    k: int = Field(default=settings.top_k, ge=1, le=20)
+    # Which documents to search. None = all built-in samples plus every uploaded doc.
+    doc_ids: list[str] | None = Field(default=None, max_length=500)
+    user_chunks: list[ChunkIn] = Field(default_factory=list, max_length=MAX_USER_CHUNKS)
 
 
 def _check_rate_limit(request: Request) -> None:
@@ -51,32 +78,24 @@ def _check_rate_limit(request: Request) -> None:
     window.append(now)
 
 
-class AskRequest(BaseModel):
-    question: str = Field(min_length=3, max_length=2000)
-    k: int = Field(default=settings.top_k, ge=1, le=20)
-
-
-def _folders() -> list[Path]:
-    return [p for p in (Path(settings.data_dir), Path(settings.upload_dir)) if p.is_dir() and any(p.iterdir())]
-
-
-def rebuild_index() -> Retriever:
-    global _retriever
-    chunks = [c for folder in _folders() for c in ingest_folder(folder, settings.chunk_words, settings.chunk_overlap)]
-    save_index(chunks, settings.index_path)
-    _retriever = Retriever(chunks)
-    return _retriever
-
-
-def get_retriever() -> Retriever:
-    global _retriever
+def base_retriever() -> Retriever:
+    """Retriever over the built-in sample documents (built once per server instance)."""
+    global _base
     with _lock:
-        if _retriever is None:
-            if Path(settings.index_path).exists():
-                _retriever = Retriever(load_index(settings.index_path))
-            else:
-                rebuild_index()
-        return _retriever
+        if _base is None:
+            path = Path(settings.index_path)
+            chunks = load_index(path) if path.exists() else ingest_folder(
+                settings.data_dir, settings.chunk_words, settings.chunk_overlap)
+            _base = Retriever(chunks)
+        return _base
+
+
+def _doc_summaries(chunks: list[Chunk]) -> list[dict]:
+    docs: dict[str, dict] = {}
+    for c in chunks:
+        d = docs.setdefault(c.doc_id, {"doc_id": c.doc_id, "title": c.title, "tags": c.tags, "chunks": 0})
+        d["chunks"] += 1
+    return list(docs.values())
 
 
 @app.get("/", include_in_schema=False)
@@ -86,28 +105,24 @@ def ui() -> FileResponse:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "chunks": len(get_retriever().chunks)}
+    return {"status": "ok", "chunks": len(base_retriever().chunks)}
 
 
 @app.get("/config")
 def config() -> dict:
-    return {"ephemeral_uploads": ON_VERCEL, "model": settings.model,
-            "mode": "generative" if has_api_key() else "extractive"}
+    return {"model": settings.model, "mode": "generative" if has_api_key() else "extractive",
+            "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024)}
 
 
 @app.get("/documents")
 def documents() -> list[dict]:
-    docs: dict[str, dict] = {}
-    for c in get_retriever().chunks:
-        d = docs.setdefault(c.doc_id, {"doc_id": c.doc_id, "title": c.title, "tags": c.tags, "chunks": 0})
-        d["chunks"] += 1
-    return list(docs.values())
+    return _doc_summaries(base_retriever().chunks)
 
 
 @app.get("/examples")
 def examples() -> list[str]:
     path = Path(settings.golden_path)
-    return [row["question"] for row in load_golden(path)][:6] if path.exists() else []
+    return [row["question"] for row in load_golden(path)][:4] if path.exists() else []
 
 
 @app.get("/eval")
@@ -115,32 +130,50 @@ def evaluate(k: int = 3) -> dict:
     path = Path(settings.golden_path)
     if not path.exists():
         raise HTTPException(404, "No golden question set found")
-    return run_eval(get_retriever(), load_golden(path), k=k)
+    return run_eval(base_retriever(), load_golden(path), k=k)
 
 
-@app.post("/upload")
-async def upload(files: list[UploadFile] = File(...)) -> dict:
-    target = Path(settings.upload_dir)
-    target.mkdir(parents=True, exist_ok=True)
-    saved = []
-    for f in files:
-        name = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(f.filename or "").name)
-        if Path(name).suffix.lower() not in ALLOWED:
-            raise HTTPException(400, f"{f.filename}: only .md, .txt and .pdf files are supported")
-        data = await f.read()
-        if len(data) > MAX_UPLOAD_BYTES:
-            raise HTTPException(413, f"{f.filename}: file is larger than 20 MB")
-        (target / name).write_bytes(data)
-        saved.append(name)
-    with _lock:
-        retriever = rebuild_index()
-    return {"saved": saved, "chunks": len(retriever.chunks)}
+@app.post("/parse")
+async def parse(files: list[UploadFile] = File(...)) -> dict:
+    """Chunk uploaded files and return them. Nothing is kept on the server."""
+    out = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for f in files:
+            name = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(f.filename or "file").name)
+            if Path(name).suffix.lower() not in ALLOWED:
+                raise HTTPException(400, f"{f.filename}: only PDF, Markdown (.md) and text (.txt) files are supported")
+            data = await f.read()
+            if len(data) > MAX_UPLOAD_BYTES:
+                raise HTTPException(413, f"{f.filename}: files must be under {MAX_UPLOAD_BYTES // (1024 * 1024)} MB")
+            path = Path(tmp) / name
+            path.write_bytes(data)
+            try:
+                chunks = load_document(path, settings.chunk_words, settings.chunk_overlap)
+            except Exception:
+                raise HTTPException(422, f"{f.filename}: couldn't read this file")
+            if not chunks:
+                raise HTTPException(422, f"{f.filename}: no readable text found (scanned PDFs aren't supported yet)")
+            doc_id = f"upload-{path.stem}"
+            for c in chunks:
+                c.chunk_id = c.chunk_id.replace(path.stem, doc_id, 1)
+                c.doc_id = doc_id
+                c.text = c.text[:MAX_CHUNK_CHARS]
+            out.append({**_doc_summaries(chunks)[0], "chunk_list": [c.__dict__ for c in chunks]})
+    return {"documents": out}
 
 
 @app.post("/ask")
 def ask(req: AskRequest, request: Request) -> dict:
     _check_rate_limit(request)
-    hits = get_retriever().search(req.question, k=req.k)
+    base = base_retriever()
+    if req.user_chunks:
+        retriever = Retriever(base.chunks + [Chunk(**c.model_dump()) for c in req.user_chunks])
+    else:
+        retriever = base
+    allowed = set(req.doc_ids) if req.doc_ids is not None else None
+    if allowed is not None and not allowed:
+        raise HTTPException(400, "Select at least one document to search")
+    hits = retriever.search(req.question, k=req.k, allowed_docs=allowed)
     try:
         result = respond(req.question, hits)
     except anthropic.AuthenticationError:
@@ -157,6 +190,6 @@ def ask(req: AskRequest, request: Request) -> dict:
         "refused": result.refused,
         "model": result.model,
         "mode": result.mode,
-        "retrieved": [{"chunk_id": h.chunk.chunk_id, "label": h.chunk.label, "score": round(h.score, 3),
-                       "text": h.chunk.text, "tags": h.chunk.tags} for h in hits],
+        "retrieved": [{"chunk_id": h.chunk.chunk_id, "doc_id": h.chunk.doc_id, "label": h.chunk.label,
+                       "score": round(h.score, 3), "text": h.chunk.text} for h in hits],
     }

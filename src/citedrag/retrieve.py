@@ -52,12 +52,13 @@ class Retriever:
                     found[key] = value
         return found
 
-    def search(self, query: str, k: int = 5) -> list[Hit]:
+    def search(self, query: str, k: int = 5, allowed_docs: set[str] | None = None) -> list[Hit]:
+        """Top-k chunks for the query. If allowed_docs is given, only those documents are searched."""
         scores = self.bm25.get_scores(tokenize(query))
         wanted = self.detect_tags(query)
         hits = []
         for chunk, score in zip(self.chunks, scores):
-            if score <= 0:
+            if score <= 0 or (allowed_docs is not None and chunk.doc_id not in allowed_docs):
                 continue
             for key, value in wanted.items():
                 have = chunk.tags.get(key, "").lower()

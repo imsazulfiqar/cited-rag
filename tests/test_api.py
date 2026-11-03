@@ -8,18 +8,20 @@ from fastapi.testclient import TestClient
 from citedrag import api
 from citedrag.generate import Answer, Citation
 
+SPAIN = b"---\ntitle: Spain brief\nmarket: Spain\n---\n# Pricing\nThe average price in Spain was 1,900 euros in 2025."
+
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    object.__setattr__(api.settings, "index_path", str(tmp_path / "index.json"))
-    object.__setattr__(api.settings, "upload_dir", str(tmp_path / "uploads"))
-    api._retriever = None
+    object.__setattr__(api.settings, "index_path", str(tmp_path / "missing-index.json"))
+    api._base = None
 
-    def fake_answer(question, hits, client=None):
+    def fake_respond(question, hits, client=None):
+        if not hits:
+            return Answer("nothing found")
         c = hits[0].chunk
-        return Answer("Fear of theft is the top barrier[1].", [Citation(1, c.chunk_id, c.label, "fear of theft (47%)")],
-                      model="stub")
-    monkeypatch.setattr(api, "respond", fake_answer)
+        return Answer("Top answer[1].", [Citation(1, c.chunk_id, c.label, c.text[:40])], model="stub")
+    monkeypatch.setattr(api, "respond", fake_respond)
     return TestClient(api.app)
 
 
@@ -33,27 +35,46 @@ def test_ask_returns_citations_and_passages(client):
     assert r.status_code == 200
     body = r.json()
     assert body["citations"][0]["number"] == 1
-    assert body["retrieved"][0]["chunk_id"].startswith("ebike_uk_2026")
-    assert "text" in body["retrieved"][0]
+    assert body["retrieved"][0]["doc_id"] == "ebike_uk_2026"
 
 
 def test_ask_validates_input(client):
     assert client.post("/ask", json={"question": "x"}).status_code == 422
+    assert client.post("/ask", json={"question": "price?", "doc_ids": []}).status_code == 400
+
+
+def test_doc_filter_limits_search(client):
+    r = client.post("/ask", json={"question": "average selling price", "doc_ids": ["ebike_france_2026"]})
+    assert {p["doc_id"] for p in r.json()["retrieved"]} == {"ebike_france_2026"}
 
 
 def test_documents_examples_eval(client):
     assert len(client.get("/documents").json()) == 3
-    assert len(client.get("/examples").json()) == 6
-    assert client.get("/eval?k=3").json()["summary"]["hit@3"] == 1.0
+    assert len(client.get("/examples").json()) == 4
+    result = client.get("/eval?k=3").json()
+    assert result["summary"]["hit@3"] == 1.0
+    assert result["rows"][0]["found_at"] == 1 and result["rows"][0]["expected"] == ["ebike_uk_2026"]
 
 
-def test_upload_adds_document_and_rejects_bad_types(client):
-    md = b"---\ntitle: Spain brief\nmarket: Spain\n---\n# Pricing\nThe average price in Spain was 1,900 euros."
-    r = client.post("/upload", files=[("files", ("spain.md", io.BytesIO(md), "text/markdown"))])
-    assert r.status_code == 200 and r.json()["saved"] == ["spain.md"]
-    assert any(d["doc_id"] == "spain" for d in client.get("/documents").json())
-    bad = client.post("/upload", files=[("files", ("x.exe", io.BytesIO(b"x"), "application/octet-stream"))])
+def test_parse_then_ask_own_document(client):
+    r = client.post("/parse", files=[("files", ("spain.md", io.BytesIO(SPAIN), "text/markdown"))])
+    assert r.status_code == 200
+    doc = r.json()["documents"][0]
+    assert doc["doc_id"] == "upload-spain" and doc["chunk_list"][0]["doc_id"] == "upload-spain"
+    # nothing is stored server-side: samples are unchanged
+    assert len(client.get("/documents").json()) == 3
+
+    ask = client.post("/ask", json={"question": "average price in Spain?", "doc_ids": ["upload-spain"],
+                                     "user_chunks": doc["chunk_list"]})
+    assert ask.status_code == 200
+    assert ask.json()["retrieved"][0]["doc_id"] == "upload-spain"
+
+
+def test_parse_rejects_bad_files(client):
+    bad = client.post("/parse", files=[("files", ("x.exe", io.BytesIO(b"x"), "application/octet-stream"))])
     assert bad.status_code == 400
+    empty = client.post("/parse", files=[("files", ("empty.txt", io.BytesIO(b"   "), "text/plain"))])
+    assert empty.status_code == 422
 
 
 def test_rate_limit(client):

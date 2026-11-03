@@ -2,7 +2,7 @@
 
 **Grounded, cited question answering over long documents, with a built-in evaluation suite.**
 
-Analysts often have to dig answers out of long, dense reports. A plain chatbot over those reports is risky: it can blend markets together, invent figures, and give no way to check where an answer came from. `citedrag` answers questions only from the documents, cites the exact passage behind every claim, and includes an evaluation harness. The harness shows whether a change to the pipeline actually improved quality. A public version of the kind of RAG based market research tool I built at work: ask questions about long reports and get answers that cite the exact passage they came from, plus an evaluation suite to check retrieval quality.
+Analysts often have to dig answers out of long, dense reports. A plain chatbot over those reports is risky: it can blend markets together, invent figures, and give no way to check where an answer came from. `citedrag` answers questions only from the documents, cites the exact passage behind every claim, and includes an evaluation harness. The harness shows whether a change to the pipeline actually improved quality.
 
 Example of the output format:
 
@@ -16,11 +16,17 @@ The most cited barrier among UK non-owners is fear of theft (47%)[1], ahead of u
 
 ## Web app
 
-A web interface for asking questions is served at `/`:
+A web interface is served at `/` with two pages.
 
-- **Ask:** type a question or pick an example. The answer shows numbered citations; click one to highlight the exact quoted passage. You can also expand the retrieved passages and their scores.
-- **Documents:** see what is indexed, and drag in your own `.pdf`, `.md` or `.txt` files to add them.
-- **Evaluation:** run the golden question set in one click and see hit@1, hit@k and MRR per question.
+**Ask**
+- A **Documents** panel lists the sample reports and anything you add. Add `.pdf`, `.md` or `.txt` files from the panel, with the paperclip button next to the question box, or by dragging them anywhere onto the page.
+- Tick or untick documents to choose what gets searched.
+- Uploaded files stay in your browser tab and are sent along with each question. They are never stored on the server.
+- Questions and answers stack up like a conversation. Click a citation number to highlight the quoted passage it came from, or expand the list of every passage that was searched.
+
+**How accurate is it?**
+- Explains in plain language what is being measured. Ten test questions, each with a known source report, are run through the same search the Ask page uses.
+- Shows how often the right report was ranked first, how often it was in the top 3, and the mean reciprocal rank (MRR), plus a question-by-question table.
 
 ### Two answer modes
 
@@ -73,15 +79,39 @@ export ANTHROPIC_API_KEY=sk-ant-...  # optional: AI-written answers + LLM judge
 citedrag eval -k 3 --judge
 ```
 
+## Deploy to Vercel
+
+1. Push this repo to GitHub.
+2. On vercel.com: **Add New → Project**, import the repo, keep the defaults and click **Deploy**. Vercel detects the FastAPI app in `app.py`.
+3. Optional: under **Settings → Environment Variables**, add `ANTHROPIC_API_KEY` and redeploy to switch to generative mode.
+
+Notes for the hosted version:
+- Vercel's filesystem is read-only apart from `/tmp`, so the sample index is rebuilt there on startup.
+- Uploaded documents are kept in each visitor's browser, not on the server. They stay private to that visitor and work fine on serverless hosting. Files are limited to 4 MB each because Vercel caps request bodies at 4.5 MB.
+- To protect your API bill, each visitor is limited to 20 questions per hour on Vercel (`CITEDRAG_ASK_LIMIT`; `0` turns it off). It is a per-instance soft limit, so also set a monthly spend limit in the Anthropic Console.
+
+To use your own documents, put `.md`, `.txt` or `.pdf` files in a folder and run `citedrag ingest path/to/folder`. Add `market:` (or any other `key: value`) front matter to Markdown files to enable tag boosting. Then write questions in `eval/golden.jsonl` in the same format as the examples.
+
 ## API
 
-`POST /ask`
+| Endpoint | What it does |
+| --- | --- |
+| `GET /documents` | Lists the built-in sample documents. |
+| `POST /parse` | Takes uploaded files (multipart) and returns their chunks. Nothing is stored on the server. |
+| `POST /ask` | Answers a question. Body: `question`, optional `k`, optional `doc_ids` (which documents to search) and optional `user_chunks` (chunks returned by `/parse`). |
+| `GET /examples` | Sample questions for the sample documents. |
+| `GET /eval` | Retrieval metrics on the golden question set, with no model calls. |
+| `GET /config` | Current answer mode (extractive or generative) and the upload size limit. |
 
 ```json
-{ "question": "What was the average selling price in Germany?", "k": 5 }
+{
+  "question": "What was the average selling price in Germany?",
+  "k": 5,
+  "doc_ids": ["ebike_germany_2026"]
+}
 ```
 
-The response contains the answer, numbered citations (chunk id, label and quoted text), the retrieved chunks with their scores, and a `refused` flag.
+The `/ask` response contains the answer, numbered citations (chunk id, label and quoted text), the retrieved passages with their scores, the answer mode, and a `refused` flag.
 
 ## Results on the sample set
 
@@ -99,7 +129,7 @@ _The sample corpus is three short **synthetic** market briefs written for this r
 pytest -q
 ```
 
-The tests cover normalisation, chunking, market-aware retrieval, the metrics, citation rendering, extractive mode and every API endpoint, including uploads and the rate limit. Model calls are stubbed, so the tests run without an API key. CI runs them on every push.
+The tests cover normalisation, chunking, market-aware retrieval, the metrics, citation rendering, extractive mode and every API endpoint, including parsing uploaded files, asking about your own documents, document filtering and the rate limit. Model calls are stubbed, so the tests run without an API key. CI runs them on every push.
 
 ## Design notes
 
@@ -111,5 +141,4 @@ The tests cover normalisation, chunking, market-aware retrieval, the metrics, ci
 
 - [ ] Hybrid retrieval (BM25 + embeddings) with reciprocal rank fusion, compared on the eval set
 - [ ] OCR for tables and charts in scanned PDFs
-- [ ] Persistent uploads with Vercel Blob
 - [ ] Streamed answers in the web app

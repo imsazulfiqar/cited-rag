@@ -40,6 +40,8 @@ def run_eval(retriever: Retriever, golden: list[dict], k: int = 5, use_llm: bool
             "id": item["id"],
             "question": item["question"],
             "retrieved": docs,
+            "expected": sorted(expected),
+            "found_at": next((i for i, d in enumerate(docs, start=1) if d in expected), None),
             "hit@1": hit_at_k(docs, expected, 1),
             f"hit@{k}": hit_at_k(docs, expected, k),
             "mrr": reciprocal_rank(docs, expected),

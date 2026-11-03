@@ -59,17 +59,24 @@ def extractive_answer(question: str, hits: list[Hit], max_sentences: int = 3) ->
     if not hits:
         return Answer("I couldn't find anything relevant to that question in the documents.", mode="extractive")
     q = set(tokenize(question))
+    top = hits[0].score or 1.0
     candidates = []
     for rank, hit in enumerate(hits):
+        # Words from the section heading and title count too: a sentence under
+        # "Consumer barriers" is about barriers even if it never says the word.
+        context = q & set(tokenize(f"{hit.chunk.section} {hit.chunk.title}"))
         for sentence in _SENTENCE.split(hit.chunk.text.strip()):
-            overlap = len(q & set(tokenize(sentence)))
-            if overlap:
-                # Prefer sentences sharing more query terms, from higher-ranked passages.
-                candidates.append((overlap + hit.score / (hits[0].score or 1), rank, sentence.strip(), hit))
-    candidates.sort(key=lambda c: (-c[0], c[1]))
-    picked = candidates[:max_sentences]
-    if not picked:
+            own = q & set(tokenize(sentence))
+            if not own and not context:
+                continue
+            score = 2 * len(own) + len(context - own) + hit.score / top
+            candidates.append((score, rank, sentence.strip(), hit))
+    if not candidates:
         return Answer("The documents don't seem to contain an answer to that question.", mode="extractive")
+    candidates.sort(key=lambda c: (-c[0], c[1]))
+    best = candidates[0][0]
+    # Keep only sentences that are nearly as relevant as the best one, to avoid filler.
+    picked = [c for c in candidates if c[0] >= 0.75 * best][:max_sentences]
 
     citations, parts = [], []
     for i, (_, _, sentence, hit) in enumerate(picked, start=1):

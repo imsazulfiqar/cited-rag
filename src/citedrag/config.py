@@ -16,9 +16,8 @@ class Settings:
     chunk_words: int = int(os.getenv("CITEDRAG_CHUNK_WORDS", "180"))
     chunk_overlap: int = int(os.getenv("CITEDRAG_CHUNK_OVERLAP", "30"))
     index_path: str = os.getenv("CITEDRAG_INDEX", f"{_RUNTIME_DIR}/index.json")
-    # Folders indexed on startup if no index exists yet; uploads are saved to upload_dir.
+    # Built-in sample documents, indexed on startup if no index file exists.
     data_dir: str = os.getenv("CITEDRAG_DATA_DIR", "data/sample")
-    upload_dir: str = os.getenv("CITEDRAG_UPLOAD_DIR", f"{_RUNTIME_DIR}/uploads" if ON_VERCEL else "data/uploads")
     golden_path: str = os.getenv("CITEDRAG_GOLDEN", "eval/golden.jsonl")
     # Questions allowed per visitor IP per hour (protects your API bill on a public demo). 0 = unlimited.
     ask_limit_per_hour: int = int(os.getenv("CITEDRAG_ASK_LIMIT", "20" if ON_VERCEL else "0"))

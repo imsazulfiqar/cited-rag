@@ -3,365 +3,488 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>citedrag · Cited Document Q&amp;A</title>
-<meta name="description" content="Ask questions about long documents and get answers with citations to the exact source passage." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23000319'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-family='Arial' font-weight='800' font-size='30' fill='%23CBACF9'%3E%E2%80%9D%3C/text%3E%3C/svg%3E" />
+<title>citedrag · Ask Your Documents</title>
+<meta name="description" content="Upload documents, ask questions, and get answers that cite the exact passage they came from." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23000319'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-family='Georgia' font-weight='700' font-size='40' fill='%23CBACF9'%3E%E2%80%9D%3C/text%3E%3C/svg%3E" />
 <style>
   :root {
-    --bg: #000319; --panel: #0b0e24; --panel-2: #10132e; --border: rgba(255,255,255,.1);
-    --text: #f5f6ff; --muted: #a9adcc; --accent: #cbacf9; --accent-2: #7dd3fc;
-    --good: #86efac; --warn: #fcd34d; --bad: #fca5a5; --mark: rgba(203,172,249,.18);
-    --radius: 16px; --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --bg: #05071a; --panel: #0c0f27; --panel-2: #12163a; --line: rgba(255,255,255,.09); --line-2: rgba(255,255,255,.16);
+    --text: #f3f4ff; --muted: #a3a8c8; --faint: #6f7497; --accent: #cbacf9; --accent-2: #7dd3fc;
+    --good: #86efac; --bad: #fca5a5; --mark: rgba(203,172,249,.16); --mark-2: rgba(125,211,252,.12);
+    --radius: 14px; --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --on-accent: #0a0b1f;
   }
   @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) {
-      --bg: #f7f7fc; --panel: #ffffff; --panel-2: #f0eefb; --border: rgba(20,20,60,.12);
-      --text: #12142b; --muted: #5a5e7d; --accent: #6d3fc4; --accent-2: #0369a1;
-      --good: #15803d; --warn: #a16207; --bad: #b91c1c; --mark: rgba(109,63,196,.12);
+    :root {
+      --bg: #f6f6fb; --panel: #ffffff; --panel-2: #f1effa; --line: rgba(20,20,60,.10); --line-2: rgba(20,20,60,.18);
+      --text: #14162e; --muted: #575c7e; --faint: #8a8eab; --accent: #6d3fc4; --accent-2: #0b6fa8;
+      --good: #15803d; --bad: #b91c1c; --mark: rgba(109,63,196,.10); --mark-2: rgba(11,111,168,.08); --on-accent: #ffffff;
     }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.55; }
-  a { color: var(--accent); }
   button, input, textarea { font: inherit; color: inherit; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px 64px; }
-
-  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 28px 0 20px; flex-wrap: wrap; }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .logo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 26px;
-          background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #000319; }
-  .brand h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
-  .brand p { margin: 0; color: var(--muted); font-size: 13px; }
-  nav { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 4px; }
-  nav button { background: none; border: 0; padding: 8px 14px; border-radius: 9px; cursor: pointer; color: var(--muted); font-size: 14px; }
-  nav button[aria-selected="true"] { background: var(--panel-2); color: var(--text); }
-  nav button:focus-visible, .chip:focus-visible, .btn:focus-visible, sup button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
-  .muted { color: var(--muted); }
-  .small { font-size: 13px; }
+  a { color: var(--accent); }
   .hidden { display: none !important; }
+  .muted { color: var(--muted); } .faint { color: var(--faint); } .small { font-size: 13px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 
-  /* Ask */
-  .ask-box { display: flex; flex-direction: column; gap: 12px; }
-  textarea { width: 100%; min-height: 84px; resize: vertical; padding: 14px 16px; border-radius: 12px; background: var(--panel-2);
-             border: 1px solid var(--border); outline: none; font-size: 16px; }
-  textarea:focus { border-color: var(--accent); }
-  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .btn { border: 0; border-radius: 10px; padding: 10px 18px; cursor: pointer; font-weight: 600;
-         background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #000319; }
-  .btn:disabled { opacity: .55; cursor: progress; }
-  .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-  .chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); text-align: left; }
-  .chip:hover { color: var(--text); border-color: var(--accent); }
-  .k { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; margin-left: auto; }
-  .k input { width: 56px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); }
+  /* ---------- top bar ---------- */
+  .top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .top-inner { max-width: 1240px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font: 700 26px/1 Georgia, serif; padding-top: 8px;
+          background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--on-accent); }
+  .brand b { font-size: 17px; letter-spacing: -.01em; }
+  .brand span { display: block; font-size: 12px; color: var(--muted); }
+  .tabs { display: flex; gap: 4px; }
+  .tabs button { background: none; border: 0; padding: 8px 12px; border-radius: 9px; cursor: pointer; color: var(--muted); font-size: 14px; }
+  .tabs button[aria-selected="true"] { color: var(--text); background: var(--panel-2); }
+  .mode { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); white-space: nowrap; cursor: help; }
+  @media (max-width: 640px) { .brand span, .mode { display: none; } .tabs button { padding: 8px 9px; font-size: 13px; } }
 
-  .results { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
-  @media (max-width: 860px) { .results { grid-template-columns: 1fr; } .k { margin-left: 0; } }
-  .answer { font-size: 16.5px; }
-  .answer p { margin: 0 0 12px; }
-  .answer ul { margin: 0 0 12px; padding-left: 20px; }
-  sup button { border: 0; background: var(--mark); color: var(--accent); border-radius: 6px; padding: 0 5px; margin-left: 2px;
-               font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1.6; }
-  .label { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; font-weight: 600; }
-  .cite { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; transition: border-color .2s, background .2s; }
-  .cite.active { border-color: var(--accent); background: var(--mark); }
-  .cite .src { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-  .cite blockquote { margin: 0; font-size: 14px; }
-  .num { display: inline-block; min-width: 22px; text-align: center; background: var(--mark); color: var(--accent); border-radius: 6px; font-size: 12px; font-weight: 700; margin-right: 6px; }
-  details { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 12px; }
-  summary { cursor: pointer; color: var(--muted); font-size: 14px; }
-  .chunk { font-size: 13px; padding: 10px 0; border-bottom: 1px dashed var(--border); }
-  .chunk:last-child { border-bottom: 0; }
-  .score { font-variant-numeric: tabular-nums; color: var(--accent-2); }
-  .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 14px; }
-  .error { border-color: var(--bad); color: var(--bad); }
-  .empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+  /* ---------- layout ---------- */
+  .layout { max-width: 1240px; margin: 0 auto; padding: 20px 16px 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
 
-  .dots span { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; background: var(--accent); animation: b 1s infinite ease-in-out; }
-  .dots span:nth-child(2) { animation-delay: .15s; } .dots span:nth-child(3) { animation-delay: .3s; }
-  @keyframes b { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
-  @media (prefers-reduced-motion: reduce) { .dots span { animation: none; opacity: .7; } }
-
-  /* Documents */
-  .docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 16px; }
-  .doc h3 { margin: 0 0 6px; font-size: 15px; }
-  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-  .tag { font-size: 12px; background: var(--panel-2); border-radius: 6px; padding: 2px 8px; color: var(--accent); }
-  .drop { display: block; border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; }
-  .drop.over, .drop:hover { border-color: var(--accent); background: var(--mark); }
+  /* ---------- documents panel ---------- */
+  .docs-panel { position: sticky; top: 76px; align-self: start; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; max-height: calc(100vh - 96px); overflow: auto; }
+  @media (max-width: 900px) { .docs-panel { position: static; max-height: none; } }
+  .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .panel-head h2 { font-size: 15px; margin: 0; }
+  .linkish { background: none; border: 0; color: var(--accent); cursor: pointer; font-size: 12.5px; padding: 0; }
+  .drop { display: block; margin: 12px 0 6px; border: 1.5px dashed var(--line-2); border-radius: 12px; padding: 16px 12px; text-align: center; cursor: pointer; transition: background .15s, border-color .15s; }
+  .drop:hover, .drop.over { border-color: var(--accent); background: var(--mark); }
   .drop input { display: none; }
+  .drop strong { display: block; font-size: 14px; }
+  .group { margin-top: 14px; }
+  .group-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--faint); margin: 0 0 6px; }
+  .doc { display: flex; align-items: flex-start; gap: 10px; padding: 8px; border-radius: 10px; cursor: pointer; }
+  .doc:hover { background: var(--panel-2); }
+  .doc input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; cursor: pointer; }
+  .doc .t { display: block; font-size: 13.5px; line-height: 1.35; }
+  .doc .s { display: block; font-size: 12px; color: var(--faint); }
+  .doc .x { margin-left: auto; background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
+  .doc .x:hover { color: var(--bad); background: var(--mark); }
+  .status { font-size: 12.5px; min-height: 18px; }
+  .ok { color: var(--good); } .err { color: var(--bad); }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--line-2); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Eval */
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+  /* ---------- conversation ---------- */
+  main { min-width: 0; display: flex; flex-direction: column; min-height: calc(100vh - 80px); }
+  .thread { flex: 1; display: flex; flex-direction: column; gap: 18px; padding-bottom: 20px; }
+  .welcome { text-align: center; padding: 28px 8px 8px; }
+  .welcome h1 { font-size: clamp(24px, 3.4vw, 34px); letter-spacing: -.02em; margin: 0 0 8px; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; text-align: left; }
+  @media (max-width: 640px) { .steps { grid-template-columns: 1fr; } }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .step .n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--mark); color: var(--accent); margin-bottom: 8px; }
+  .step b { display: block; font-size: 14.5px; margin-bottom: 2px; }
+  .step p { margin: 0; font-size: 13px; color: var(--muted); }
+  .try { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip { background: var(--panel); border: 1px solid var(--line-2); border-radius: 999px; padding: 7px 13px; font-size: 13px; cursor: pointer; color: var(--muted); }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
+
+  .qa { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .q { padding: 14px 18px; border-bottom: 1px solid var(--line); font-weight: 600; display: flex; gap: 10px; }
+  .q::before { content: "Q"; flex: none; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; background: var(--mark-2); color: var(--accent-2); margin-top: 1px; }
+  .a { padding: 16px 18px 6px; font-size: 15.5px; }
+  .a p { margin: 0 0 12px; }
+  .a ul { margin: 0 0 12px; padding-left: 20px; }
+  .cite-btn { border: 0; background: var(--mark); color: var(--accent); border-radius: 6px; padding: 0 6px; margin-left: 2px; font-size: 11.5px; font-weight: 700; cursor: pointer; vertical-align: super; line-height: 1.5; }
+  .cite-btn:hover { background: var(--accent); color: var(--on-accent); }
+  .sources { padding: 4px 18px 16px; }
+  .sources-label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--faint); margin: 8px 0; }
+  .src { display: flex; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; transition: border-color .2s, background .2s; }
+  .src.active { border-color: var(--accent); background: var(--mark); }
+  .src .num { flex: none; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--mark); color: var(--accent); }
+  .src .where { font-size: 12.5px; color: var(--muted); }
+  .src blockquote { margin: 2px 0 0; font-size: 14px; }
+  details.passages { padding: 0 18px 14px; }
+  details.passages summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  .passage { font-size: 13px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .passage:last-child { border-bottom: 0; }
+  .note { padding: 10px 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--faint); }
+  .thinking { padding: 18px; color: var(--muted); }
+  .dots span { display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: var(--accent); animation: b 1s infinite ease-in-out; }
+  .dots span:nth-child(2) { animation-delay: .15s; } .dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes b { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .dots span, .spinner { animation: none; } }
+  .qa.error .a { color: var(--bad); }
+
+  /* ---------- composer ---------- */
+  .composer { position: sticky; bottom: 0; padding: 12px 0 18px; background: linear-gradient(to top, var(--bg) 70%, transparent); }
+  .box { background: var(--panel); border: 1px solid var(--line-2); border-radius: 16px; padding: 10px; display: flex; align-items: flex-end; gap: 8px; box-shadow: 0 10px 30px -15px rgba(0,0,0,.6); }
+  .box:focus-within { border-color: var(--accent); }
+  .box textarea { flex: 1; border: 0; outline: none; background: none; resize: none; padding: 8px 6px; font-size: 15.5px; max-height: 160px; min-height: 24px; }
+  .icon-btn { flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--panel-2); cursor: pointer; display: grid; place-items: center; color: var(--muted); }
+  .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+  .send { flex: none; height: 40px; padding: 0 18px; border: 0; border-radius: 10px; cursor: pointer; font-weight: 600; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--on-accent); }
+  .send:disabled { opacity: .5; cursor: not-allowed; }
+  .scope { font-size: 12.5px; color: var(--faint); margin: 8px 4px 0; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  @media (max-width: 640px) { .scope .hint { display: none; } }
+  .page-drop { position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 80%, transparent); display: grid; place-items: center; pointer-events: none; }
+  .page-drop div { border: 2px dashed var(--accent); border-radius: 20px; padding: 40px 56px; font-size: 18px; background: var(--panel); }
+
+  /* ---------- accuracy page ---------- */
+  .accuracy { max-width: 960px; margin: 0 auto; padding: 28px 16px 64px; }
+  .accuracy h1 { font-size: clamp(24px, 3vw, 30px); margin: 0 0 6px; letter-spacing: -.02em; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin-top: 16px; }
+  .card h2 { font-size: 16px; margin: 0 0 8px; }
+  .card p { margin: 0 0 8px; color: var(--muted); }
+  .card ol { margin: 0; padding-left: 20px; color: var(--muted); }
+  .card li { margin-bottom: 4px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 640px) { .stats { grid-template-columns: 1fr; } }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
   .stat .v { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .stat .l { font-size: 13px; color: var(--muted); }
-  .table-wrap { overflow-x: auto; }
+  .stat .l { font-weight: 600; font-size: 14px; }
+  .stat .d { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .table-wrap { overflow-x: auto; margin-top: 8px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
-  td.n { font-variant-numeric: tabular-nums; }
-  .ok { color: var(--good); } .miss { color: var(--bad); }
-
-  footer { margin-top: 40px; text-align: center; font-size: 13px; color: var(--muted); }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--faint); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .pill.ok { background: rgba(134,239,172,.12); } .pill.err { background: rgba(252,165,165,.12); }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
+<header class="top">
+  <div class="top-inner">
     <div class="brand">
       <div class="logo" aria-hidden="true">”</div>
-      <div>
-        <h1>citedrag</h1>
-        <p>Answers from your documents, with a citation for every claim</p>
-      </div>
+      <div><b>citedrag</b><span>Ask your documents. Every answer shows its source.</span></div>
     </div>
-    <nav role="tablist" aria-label="Sections">
-      <button role="tab" aria-selected="true" data-tab="ask">Ask</button>
-      <button role="tab" aria-selected="false" data-tab="docs">Documents</button>
-      <button role="tab" aria-selected="false" data-tab="eval">Evaluation</button>
+    <span class="mode hidden" id="mode"></span>
+    <nav class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-view="ask">Ask</button>
+      <button role="tab" aria-selected="false" data-view="accuracy">How accurate is it?</button>
     </nav>
-  </header>
+  </div>
+</header>
 
-  <!-- ASK -->
-  <section id="tab-ask" role="tabpanel">
-    <form class="panel ask-box" id="ask-form">
-      <label for="q" class="label">Ask a question</label>
-      <textarea id="q" placeholder="e.g. What is the biggest barrier to buying an e-bike in the UK?" required minlength="3" maxlength="2000"></textarea>
-      <div class="row">
-        <div class="chips" id="examples" aria-label="Example questions"></div>
-      </div>
-      <div class="row">
-        <button class="btn" type="submit" id="ask-btn">Ask</button>
-        <span class="small muted">Ctrl/⌘ + Enter</span>
-        <label class="k" title="How many passages to retrieve">Passages <input id="k" type="number" min="1" max="20" value="5" /></label>
-      </div>
-    </form>
-
-    <div id="mode-note" class="panel small hidden" style="margin-top:12px"></div>
-    <div id="ask-empty" class="empty">Ask anything about the indexed documents. Click a citation number to see the passage it came from.</div>
-    <div id="ask-loading" class="panel hidden" style="margin-top:16px" aria-live="polite">
-      <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
-      <span class="muted">Searching the documents and writing a cited answer…</span>
+<!-- ================= ASK VIEW ================= -->
+<div id="view-ask" class="layout">
+  <aside class="docs-panel" aria-label="Documents">
+    <div class="panel-head">
+      <h2>Documents</h2>
+      <button class="linkish" id="toggle-all" type="button">Select none</button>
     </div>
-    <div id="ask-error" class="panel error hidden" style="margin-top:16px" role="alert"></div>
-
-    <div id="ask-result" class="results hidden">
-      <article class="panel">
-        <p class="label">Answer</p>
-        <div class="answer" id="answer" aria-live="polite"></div>
-        <div class="meta" id="answer-meta"></div>
-      </article>
-      <aside class="panel">
-        <p class="label">Sources</p>
-        <div id="citations"></div>
-        <details>
-          <summary>Retrieved passages (<span id="retrieved-count">0</span>)</summary>
-          <div id="retrieved"></div>
-        </details>
-      </aside>
-    </div>
-  </section>
-
-  <!-- DOCUMENTS -->
-  <section id="tab-docs" role="tabpanel" class="hidden">
-    <label class="drop panel" id="drop">
-      <input type="file" id="file" multiple accept=".md,.txt,.pdf" />
-      <strong>Add documents</strong>
-      <div class="small muted">Drop .pdf, .md or .txt files here, or click to choose (max 20 MB each)</div>
-      <div class="small" id="upload-status" aria-live="polite" style="margin-top:8px"></div>
+    <label class="drop" id="drop">
+      <input type="file" id="file" multiple accept=".pdf,.md,.txt" />
+      <strong>+ Add your documents</strong>
+      <span class="small muted">PDF, Markdown or text · drag &amp; drop or click</span>
     </label>
-    <p class="small muted" id="upload-note"></p>
-    <div class="docs" id="docs"></div>
-  </section>
+    <div class="status" id="upload-status" aria-live="polite"></div>
+    <p class="small faint" style="margin:4px 0 0">Your files stay in this browser tab and aren't stored on the server.</p>
 
-  <!-- EVAL -->
-  <section id="tab-eval" role="tabpanel" class="hidden">
-    <div class="panel">
-      <p class="label">Retrieval evaluation</p>
-      <p class="muted" style="margin-top:0">Runs the golden question set and checks whether the right document is retrieved. No model calls, so it's free and instant. Use it to compare retrieval changes with numbers.</p>
-      <div class="row">
-        <button class="btn" id="eval-btn">Run evaluation</button>
-        <label class="k" style="margin-left:0">top-k <input id="eval-k" type="number" min="1" max="20" value="3" /></label>
-      </div>
-      <div id="eval-out"></div>
+    <div class="group hidden" id="my-docs-group">
+      <p class="group-label">Your documents</p>
+      <div id="my-docs"></div>
     </div>
-  </section>
+    <div class="group">
+      <p class="group-label">Sample reports</p>
+      <div id="sample-docs"><p class="small faint">Loading…</p></div>
+    </div>
+  </aside>
 
-  <footer>
-    Built with FastAPI, BM25 retrieval and Claude's citations API ·
-    <a href="/docs">API docs</a>
-  </footer>
+  <main>
+    <div class="thread" id="thread">
+      <section class="welcome" id="welcome">
+        <h1>Ask questions about your documents</h1>
+        <p class="muted" style="margin:0">Answers come only from the documents you select, and every claim links to the passage it came from.</p>
+        <div class="steps">
+          <div class="step"><div class="n">1</div><b>Add documents</b><p>Upload PDFs or text files on the left, or use the sample market reports.</p></div>
+          <div class="step"><div class="n">2</div><b>Ask a question</b><p>Type it below. Untick documents on the left to narrow the search.</p></div>
+          <div class="step"><div class="n">3</div><b>Check the sources</b><p>Click a citation number to see the exact passage behind that sentence.</p></div>
+        </div>
+        <p class="small faint" style="margin:0 0 10px">Try one of these on the sample reports:</p>
+        <div class="try" id="examples"></div>
+      </section>
+    </div>
+
+    <form class="composer" id="ask-form">
+      <div class="box">
+        <button type="button" class="icon-btn" id="attach" title="Add documents" aria-label="Add documents">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <textarea id="q" rows="1" placeholder="Ask a question about the selected documents…" maxlength="2000" aria-label="Your question"></textarea>
+        <button class="send" id="send" type="submit" disabled>Ask</button>
+      </div>
+      <div class="scope"><span id="scope-text"></span><span class="hint">Enter to send · Shift + Enter for a new line</span></div>
+    </form>
+  </main>
 </div>
 
-<script>
-const $ = (s) => document.querySelector(s);
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+<!-- ================= ACCURACY VIEW ================= -->
+<div id="view-accuracy" class="accuracy hidden">
+  <h1>How accurate is the search?</h1>
+  <p class="muted" style="margin:0">Every answer depends on first finding the right passages. This page measures how well that search step works.</p>
 
+  <div class="card">
+    <h2>What's being tested</h2>
+    <ol>
+      <li>We wrote <b id="n-questions">10</b> test questions about the three sample reports. For each one, we already know which report contains the answer.</li>
+      <li>Each question is run through the same search the Ask page uses.</li>
+      <li>We check where the correct report appears in the results.</li>
+    </ol>
+    <p style="margin-top:10px">It tests <b>finding the right source</b>, not the wording of the answer. It uses no AI model, so it's free and runs in under a second. Developers use it to check that a change to the search made results better, not worse.</p>
+  </div>
+
+  <div id="acc-out"><p class="muted" style="margin-top:16px"><span class="spinner"></span>Running the test questions…</p></div>
+</div>
+
+<div class="page-drop hidden" id="page-drop"><div>Drop files to add them</div></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   let body = null;
-  try { body = await res.json(); } catch { /* non-JSON */ }
-  if (!res.ok) throw new Error((body && body.detail) || `Request failed (${res.status})`);
+  try { body = await res.json(); } catch {}
+  if (!res.ok) throw new Error((body && (typeof body.detail === "string" ? body.detail : "Invalid request")) || `Request failed (${res.status})`);
   return body;
 }
 
-/* ---------- tabs ---------- */
-const loaded = {};
-document.querySelectorAll("nav button").forEach((btn) => btn.addEventListener("click", () => {
-  document.querySelectorAll("nav button").forEach((b) => b.setAttribute("aria-selected", b === btn));
-  document.querySelectorAll("[role=tabpanel]").forEach((p) => p.classList.add("hidden"));
-  $(`#tab-${btn.dataset.tab}`).classList.remove("hidden");
-  if (btn.dataset.tab === "docs" && !loaded.docs) loadDocs();
+/* ================= state ================= */
+const state = { samples: [], mine: [], selected: new Set(), busy: false };
+const STORE = "citedrag-docs";
+function saveMine() {
+  try { sessionStorage.setItem(STORE, JSON.stringify(state.mine)); } catch { /* too large or blocked: keep in memory only */ }
+}
+function loadMine() {
+  try { return JSON.parse(sessionStorage.getItem(STORE) || "[]"); } catch { return []; }
+}
+
+/* ================= views ================= */
+let accuracyLoaded = false;
+document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
+  $("#view-ask").classList.toggle("hidden", b.dataset.view !== "ask");
+  $("#view-accuracy").classList.toggle("hidden", b.dataset.view !== "accuracy");
+  if (b.dataset.view === "accuracy" && !accuracyLoaded) loadAccuracy();
+  window.scrollTo(0, 0);
 }));
 
-/* ---------- ask ---------- */
-function renderAnswer(text) {
-  // Minimal markdown: paragraphs, bullet lists, **bold**; citation markers become buttons.
-  const blocks = esc(text).split(/\n{2,}/);
-  return blocks.map((b) => {
-    let html = b.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-                .replace(/\[(\d+)\]/g, '<sup><button type="button" data-cite="$1" aria-label="Show source $1">$1</button></sup>');
-    const lines = html.split("\n");
-    if (lines.every((l) => /^\s*[-*•]\s+/.test(l))) {
-      return "<ul>" + lines.map((l) => `<li>${l.replace(/^\s*[-*•]\s+/, "")}</li>`).join("") + "</ul>";
+/* ================= documents ================= */
+function docRow(d, removable) {
+  const checked = state.selected.has(d.doc_id) ? "checked" : "";
+  const tags = Object.values(d.tags || {}).filter(Boolean).slice(0, 2).join(" · ");
+  return `<label class="doc">
+      <input type="checkbox" data-doc="${esc(d.doc_id)}" ${checked} />
+      <span><span class="t">${esc(d.title)}</span><span class="s">${d.chunks} passage${d.chunks === 1 ? "" : "s"}${tags ? " · " + esc(tags) : ""}</span></span>
+      ${removable ? `<button type="button" class="x" data-remove="${esc(d.doc_id)}" aria-label="Remove ${esc(d.title)}" title="Remove">×</button>` : ""}
+    </label>`;
+}
+function renderDocs() {
+  $("#sample-docs").innerHTML = state.samples.map((d) => docRow(d, false)).join("") || `<p class="small faint">None</p>`;
+  $("#my-docs").innerHTML = state.mine.map((d) => docRow(d, true)).join("");
+  $("#my-docs-group").classList.toggle("hidden", !state.mine.length);
+  const all = [...state.samples, ...state.mine];
+  const n = all.filter((d) => state.selected.has(d.doc_id)).length;
+  $("#scope-text").textContent = n === all.length ? `Searching all ${n} documents` : `Searching ${n} of ${all.length} documents`;
+  $("#toggle-all").textContent = n === all.length ? "Select none" : "Select all";
+  updateSend();
+}
+document.querySelector(".docs-panel").addEventListener("change", (e) => {
+  const id = e.target.dataset && e.target.dataset.doc;
+  if (!id) return;
+  e.target.checked ? state.selected.add(id) : state.selected.delete(id);
+  renderDocs();
+});
+document.querySelector(".docs-panel").addEventListener("click", (e) => {
+  const id = e.target.dataset && e.target.dataset.remove;
+  if (!id) return;
+  e.preventDefault();
+  state.mine = state.mine.filter((d) => d.doc_id !== id);
+  state.selected.delete(id);
+  saveMine(); renderDocs();
+});
+$("#toggle-all").addEventListener("click", () => {
+  const all = [...state.samples, ...state.mine];
+  const everything = all.every((d) => state.selected.has(d.doc_id));
+  state.selected = everything ? new Set() : new Set(all.map((d) => d.doc_id));
+  renderDocs();
+});
+
+async function addFiles(files) {
+  files = [...files];
+  if (!files.length) return;
+  const status = $("#upload-status");
+  status.innerHTML = `<span class="spinner"></span>Reading ${files.length} file${files.length === 1 ? "" : "s"}…`;
+  const fd = new FormData();
+  files.forEach((f) => fd.append("files", f));
+  try {
+    const res = await api("/parse", { method: "POST", body: fd });
+    for (const d of res.documents) {
+      state.mine = state.mine.filter((m) => m.doc_id !== d.doc_id);
+      state.mine.push(d);
+      state.selected.add(d.doc_id);
     }
+    // Focus the search on the new uploads by default: deselect the samples.
+    state.samples.forEach((s) => state.selected.delete(s.doc_id));
+    saveMine(); renderDocs();
+    status.innerHTML = `<span class="ok">Added ${res.documents.map((d) => esc(d.title)).join(", ")}. Now searching your documents.</span>`;
+    $("#q").focus();
+  } catch (err) {
+    status.innerHTML = `<span class="err">${esc(err.message)}</span>`;
+  } finally {
+    $("#file").value = "";
+  }
+}
+$("#file").addEventListener("change", (e) => addFiles(e.target.files));
+$("#attach").addEventListener("click", () => $("#file").click());
+
+const drop = $("#drop"), pageDrop = $("#page-drop");
+let dragDepth = 0;
+window.addEventListener("dragenter", (e) => { if ([...e.dataTransfer.types].includes("Files")) { dragDepth++; pageDrop.classList.remove("hidden"); drop.classList.add("over"); } });
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; pageDrop.classList.add("hidden"); drop.classList.remove("over"); } });
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => {
+  e.preventDefault(); dragDepth = 0; pageDrop.classList.add("hidden"); drop.classList.remove("over");
+  if (e.dataTransfer.files.length && !$("#view-ask").classList.contains("hidden")) addFiles(e.dataTransfer.files);
+});
+
+/* ================= asking ================= */
+function renderAnswer(text, id) {
+  return esc(text).split(/\n{2,}/).map((b) => {
+    let html = b.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\[(\d+)\]/g, `<button type="button" class="cite-btn" data-qa="${id}" data-cite="$1" aria-label="Show source $1">$1</button>`);
+    const lines = html.split("\n");
+    if (lines.length > 1 && lines.every((l) => /^\s*[-*•]\s+/.test(l))) return "<ul>" + lines.map((l) => `<li>${l.replace(/^\s*[-*•]\s+/, "")}</li>`).join("") + "</ul>";
     return `<p>${lines.join("<br>")}</p>`;
   }).join("");
 }
-
-function showCitation(n) {
-  document.querySelectorAll(".cite").forEach((c) => c.classList.toggle("active", c.dataset.n === String(n)));
-  const el = document.querySelector(`.cite[data-n="${n}"]`);
+$("#thread").addEventListener("click", (e) => {
+  const b = e.target.closest(".cite-btn");
+  if (!b) return;
+  const card = document.getElementById(b.dataset.qa);
+  card.querySelectorAll(".src").forEach((s) => s.classList.toggle("active", s.dataset.n === b.dataset.cite));
+  const el = card.querySelector(`.src[data-n="${b.dataset.cite}"]`);
   if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-}
-
-$("#answer").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-cite]");
-  if (b) showCitation(b.dataset.cite);
 });
 
+let counter = 0;
 async function ask(question) {
-  const btn = $("#ask-btn");
-  btn.disabled = true;
-  ["#ask-empty", "#ask-error", "#ask-result"].forEach((s) => $(s).classList.add("hidden"));
-  $("#ask-loading").classList.remove("hidden");
+  if (state.busy) return;
+  const selected = [...state.selected];
+  if (!selected.length) { $("#upload-status").innerHTML = `<span class="err">Tick at least one document to search.</span>`; return; }
+  state.busy = true; updateSend();
+  $("#welcome")?.remove();
+  const id = `qa-${++counter}`;
+  const card = document.createElement("article");
+  card.className = "qa"; card.id = id;
+  card.innerHTML = `<div class="q">${esc(question)}</div><div class="thinking"><span class="dots" aria-hidden="true"><span></span><span></span><span></span></span> Searching ${selected.length} document${selected.length === 1 ? "" : "s"}…</div>`;
+  $("#thread").appendChild(card);
+  card.scrollIntoView({ behavior: "smooth", block: "end" });
+
+  const myIds = new Set(state.mine.map((d) => d.doc_id));
+  const userChunks = state.mine.filter((d) => state.selected.has(d.doc_id)).flatMap((d) => d.chunk_list);
   try {
-    const k = Math.min(20, Math.max(1, parseInt($("#k").value, 10) || 5));
-    const data = await api("/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, k }) });
-    $("#answer").innerHTML = renderAnswer(data.answer);
-    $("#citations").innerHTML = data.citations.length
-      ? data.citations.map((c) => `
-          <div class="cite" data-n="${c.number}">
-            <div class="src"><span class="num">${c.number}</span>${esc(c.label)}</div>
-            <blockquote>“${esc(c.quote)}”</blockquote>
-          </div>`).join("")
-      : `<p class="muted small">No citations: the documents didn't support an answer.</p>`;
-    $("#retrieved-count").textContent = data.retrieved.length;
-    $("#retrieved").innerHTML = data.retrieved.map((r) => `
-      <div class="chunk"><div><strong>${esc(r.label)}</strong> · score <span class="score">${r.score.toFixed(2)}</span></div>
-      <div class="muted">${esc(r.text.slice(0, 260))}${r.text.length > 260 ? "…" : ""}</div></div>`).join("");
-    $("#answer-meta").innerHTML = [
-      data.mode === "extractive" ? "Extractive mode: quoted directly from the documents" : (data.model && `Model: ${esc(data.model)}`),
-      `${data.citations.length} citation${data.citations.length === 1 ? "" : "s"}`,
-      data.refused && `<span class="miss">Declined by safety filters</span>`,
-    ].filter(Boolean).map((m) => `<span>${m}</span>`).join("");
-    $("#ask-result").classList.remove("hidden");
+    const data = await api("/ask", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, k: 5, doc_ids: selected, user_chunks: userChunks }),
+    });
+    const sources = data.citations.length
+      ? `<div class="sources"><p class="sources-label">Sources</p>${data.citations.map((c) => `
+          <div class="src" data-n="${c.number}"><span class="num">${c.number}</span>
+            <div><div class="where">${esc(c.label)}${myIds.has(c.chunk_id.split(":")[0]) ? " · your document" : ""}</div>
+            <blockquote>“${esc(c.quote)}”</blockquote></div></div>`).join("")}</div>`
+      : "";
+    const passages = data.retrieved.length ? `<details class="passages"><summary>Show all ${data.retrieved.length} passages that were searched</summary>
+        ${data.retrieved.map((r) => `<div class="passage"><b>${esc(r.label)}</b> <span class="faint">· relevance ${r.score.toFixed(1)}</span><div class="muted">${esc(r.text.slice(0, 280))}${r.text.length > 280 ? "…" : ""}</div></div>`).join("")}</details>` : "";
+    const note = data.mode === "extractive"
+      ? `<div class="note">Free mode: these are the most relevant sentences quoted word for word from the documents.</div>`
+      : data.refused ? `<div class="note err">This question was declined by the model's safety filters.</div>` : "";
+    card.innerHTML = `<div class="q">${esc(question)}</div><div class="a">${renderAnswer(data.answer, id)}</div>${sources}${passages}${note}`;
   } catch (err) {
-    $("#ask-error").textContent = err.message;
-    $("#ask-error").classList.remove("hidden");
+    card.classList.add("error");
+    card.innerHTML = `<div class="q">${esc(question)}</div><div class="a"><p>${esc(err.message)}</p></div>`;
   } finally {
-    $("#ask-loading").classList.add("hidden");
-    btn.disabled = false;
+    state.busy = false; updateSend();
   }
 }
 
+const q = $("#q");
+function updateSend() { $("#send").disabled = state.busy || q.value.trim().length < 3; }
+q.addEventListener("input", () => { q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 160) + "px"; updateSend(); });
+q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#ask-form").requestSubmit(); } });
 $("#ask-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const q = $("#q").value.trim();
-  if (q.length >= 3) ask(q);
+  const text = q.value.trim();
+  if (text.length < 3 || state.busy) return;
+  q.value = ""; q.style.height = "auto"; updateSend();
+  ask(text);
 });
-$("#q").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("#ask-form").requestSubmit();
-});
 
-api("/examples").then((qs) => {
-  $("#examples").innerHTML = qs.map((q) => `<button type="button" class="chip">${esc(q)}</button>`).join("");
-  $("#examples").querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => { $("#q").value = c.textContent; ask(c.textContent); }));
-}).catch(() => {});
-
-/* ---------- documents ---------- */
-async function loadDocs() {
-  try {
-    const docs = await api("/documents");
-    loaded.docs = true;
-    $("#docs").innerHTML = docs.map((d) => `
-      <div class="panel doc">
-        <h3>${esc(d.title)}</h3>
-        <div class="small muted">${d.chunks} passage${d.chunks === 1 ? "" : "s"} · ${esc(d.doc_id)}</div>
-        <div class="tags">${Object.entries(d.tags || {}).map(([k, v]) => `<span class="tag">${esc(k)}: ${esc(v)}</span>`).join("")}</div>
-      </div>`).join("") || `<p class="muted">No documents indexed yet.</p>`;
-  } catch (err) {
-    $("#docs").innerHTML = `<p class="miss">${esc(err.message)}</p>`;
-  }
-}
-
-async function upload(files) {
-  if (!files.length) return;
-  const fd = new FormData();
-  [...files].forEach((f) => fd.append("files", f));
-  $("#upload-status").textContent = `Uploading ${files.length} file${files.length === 1 ? "" : "s"}…`;
-  try {
-    const res = await api("/upload", { method: "POST", body: fd });
-    $("#upload-status").innerHTML = `<span class="ok">Added ${res.saved.map(esc).join(", ")}. Index now has ${res.chunks} passages.</span>`;
-    loadDocs();
-  } catch (err) {
-    $("#upload-status").innerHTML = `<span class="miss">${esc(err.message)}</span>`;
-  }
-}
-$("#file").addEventListener("change", (e) => upload(e.target.files));
-const drop = $("#drop");
-["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", (e) => upload(e.dataTransfer.files));
-
-api("/config").then((c) => {
-  if (c.mode === "extractive") {
-    $("#mode-note").innerHTML = "<strong>Extractive mode.</strong> <span class='muted'>No AI model is connected, so answers are the most relevant sentences quoted straight from the documents, each with its citation.</span>";
-    $("#mode-note").classList.remove("hidden");
-  }
-  if (c.ephemeral_uploads) $("#upload-note").textContent = "Demo note: uploaded files are temporary in this hosted demo and may disappear after a few minutes of inactivity.";
-}).catch(() => {});
-
-/* ---------- eval ---------- */
+/* ================= accuracy ================= */
 const pct = (v) => (v == null ? "–" : `${Math.round(v * 100)}%`);
-$("#eval-btn").addEventListener("click", async () => {
-  const k = Math.min(20, Math.max(1, parseInt($("#eval-k").value, 10) || 3));
-  $("#eval-out").innerHTML = `<p class="muted">Running…</p>`;
+const short = (id) => (state.samples.find((d) => d.doc_id === id)?.title || id).replace(/\s*\(synthetic sample\)/, "").replace(/^E-Bike Market Brief - /, "");
+async function loadAccuracy() {
   try {
-    const r = await api(`/eval?k=${k}`);
+    const r = await api("/eval?k=3");
+    accuracyLoaded = true;
+    $("#n-questions").textContent = r.n;
     const s = r.summary;
-    $("#eval-out").innerHTML = `
+    $("#acc-out").innerHTML = `
       <div class="stats">
-        <div class="panel stat"><div class="v">${pct(s["hit@1"])}</div><div class="l">Right document ranked first (hit@1)</div></div>
-        <div class="panel stat"><div class="v">${pct(s[`hit@${k}`])}</div><div class="l">Right document in top ${k} (hit@${k})</div></div>
-        <div class="panel stat"><div class="v">${s.mrr == null ? "–" : s.mrr.toFixed(2)}</div><div class="l">Mean reciprocal rank</div></div>
-        <div class="panel stat"><div class="v">${r.n}</div><div class="l">Questions in the golden set</div></div>
+        <div class="stat"><div class="v">${pct(s["hit@1"])}</div><div class="l">Right report ranked first</div><div class="d">Share of questions where the top search result came from the correct report.</div></div>
+        <div class="stat"><div class="v">${pct(s["hit@3"])}</div><div class="l">Right report in the top 3</div><div class="d">Share of questions where the correct report appeared in the first three results.</div></div>
+        <div class="stat"><div class="v">${s.mrr == null ? "–" : s.mrr.toFixed(2)}</div><div class="l">Average rank score (MRR)</div><div class="d">1.00 means always first, 0.50 means typically second.</div></div>
       </div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Question</th><th>hit@1</th><th>MRR</th><th>Top results</th></tr></thead>
-        <tbody>${r.rows.map((row) => `<tr>
-          <td>${esc(row.question)}</td>
-          <td class="n ${row["hit@1"] ? "ok" : "miss"}">${row["hit@1"] ? "✓" : "✗"}</td>
-          <td class="n">${row.mrr.toFixed(2)}</td>
-          <td class="small muted">${row.retrieved.slice(0, 3).map(esc).join("<br>")}</td></tr>`).join("")}
-        </tbody></table></div>`;
+      <div class="card">
+        <h2>Question by question</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Test question</th><th>Answer is in</th><th>Search found it at</th></tr></thead>
+          <tbody>${r.rows.map((row) => `<tr>
+            <td>${esc(row.question)}</td>
+            <td>${row.expected.map((d) => esc(short(d))).join(", ")}</td>
+            <td>${row.found_at ? `<span class="pill ${row.found_at === 1 ? "ok" : "err"}">${row.found_at === 1 ? "✓ Position 1" : "Position " + row.found_at}</span>` : `<span class="pill err">Not found</span>`}</td>
+          </tr>`).join("")}</tbody>
+        </table></div>
+        <p class="small faint" style="margin-top:10px">The sample reports are short and synthetic, so a perfect score is expected here. Real collections of long reports are harder, and that's where this check becomes useful.</p>
+      </div>`;
   } catch (err) {
-    $("#eval-out").innerHTML = `<p class="miss">${esc(err.message)}</p>`;
+    $("#acc-out").innerHTML = `<p class="err" style="margin-top:16px">${esc(err.message)}</p>`;
   }
-});
+}
+
+/* ================= boot ================= */
+(async () => {
+  state.mine = loadMine();
+  state.mine.forEach((d) => state.selected.add(d.doc_id));
+  try {
+    state.samples = await api("/documents");
+    if (!state.mine.length) state.samples.forEach((d) => state.selected.add(d.doc_id));
+  } catch (err) {
+    $("#sample-docs").innerHTML = `<p class="small err">${esc(err.message)}</p>`;
+  }
+  renderDocs();
+
+  api("/examples").then((qs) => {
+    const box = $("#examples");
+    if (!box) return;
+    box.innerHTML = qs.map((x) => `<button type="button" class="chip">${esc(x)}</button>`).join("");
+    box.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => {
+      state.samples.forEach((d) => state.selected.add(d.doc_id)); renderDocs();
+      ask(c.textContent);
+    }));
+  }).catch(() => {});
+
+  api("/config").then((c) => {
+    const m = $("#mode");
+    if (c.mode === "extractive") {
+      m.textContent = "Free mode";
+      m.title = "No AI model is connected: answers are the most relevant sentences quoted directly from the documents, each with its source.";
+    } else {
+      m.textContent = "AI answers";
+      m.title = `Answers are written by ${c.model} using only the selected documents, with citations.`;
+    }
+    m.classList.remove("hidden");
+  }).catch(() => {});
+})();
 </script>
 </body>
 </html>
