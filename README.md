@@ -79,12 +79,6 @@ export ANTHROPIC_API_KEY=sk-ant-...  # optional: AI-written answers + LLM judge
 citedrag eval -k 3 --judge
 ```
 
-## Deploy to Vercel
-
-1. Push this repo to GitHub.
-2. On vercel.com: **Add New → Project**, import the repo, keep the defaults and click **Deploy**. Vercel detects the FastAPI app in `app.py`.
-3. Optional: under **Settings → Environment Variables**, add `ANTHROPIC_API_KEY` and redeploy to switch to generative mode.
-
 Notes for the hosted version:
 - Vercel's filesystem is read-only apart from `/tmp`, so the sample index is rebuilt there on startup.
 - Uploaded documents are kept in each visitor's browser, not on the server. They stay private to that visitor and work fine on serverless hosting. Files are limited to 4 MB each because Vercel caps request bodies at 4.5 MB.
