@@ -2,7 +2,7 @@
 
 **Grounded, cited question answering over long documents, with a built-in evaluation suite.**
 
-Analysts often have to dig answers out of long, dense reports. A plain chatbot over those reports is risky: it can blend markets together, invent figures, and give no way to check where an answer came from. `citedrag` answers questions only from the documents, cites the exact passage behind every claim, and includes an evaluation harness. The harness shows whether a change to the pipeline actually improved quality.
+Analysts often have to dig answers out of long, dense reports. A plain chatbot over those reports is risky: it can blend markets together, invent figures, and give no way to check where an answer came from. `citedrag` answers questions only from the documents, cites the exact passage behind every claim, and includes an evaluation harness. The harness shows whether a change to the pipeline actually improved quality. A mini public version of RAG tool I built at work: ask questions about long reports and get answers that cite the exact passage they came from, plus an evaluation suite to check retrieval quality.
 
 Example of the output format:
 
