@@ -147,6 +147,20 @@
   th { color: var(--faint); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
   .pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
   .pill.ok { background: rgba(134,239,172,.12); } .pill.err { background: rgba(252,165,165,.12); }
+  .section-title { font-size: clamp(20px, 2.4vw, 24px); margin: 40px 0 4px; letter-spacing: -.01em; }
+  .case { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, 260px) 32px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .case:last-of-type { border-bottom: 0; }
+  .case .idx { font-size: 12px; color: var(--faint); text-align: center; }
+  .case input, .case select { width: 100%; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--panel-2); color: var(--text); font-size: 14px; }
+  .case input:focus, .case select:focus { outline: none; border-color: var(--accent); }
+  .case .x { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 18px; border-radius: 8px; height: 32px; }
+  .case .x:hover { color: var(--bad); background: var(--mark); }
+  @media (max-width: 640px) { .case { grid-template-columns: 20px minmax(0, 1fr) 28px; } .case select { grid-column: 2 / 3; } .case .x { grid-row: 1; grid-column: 3; } }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .btn { height: 40px; padding: 0 16px; border-radius: 10px; cursor: pointer; font-weight: 600; border: 1px solid var(--line-2); background: var(--panel-2); color: var(--text); }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { border: 0; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--on-accent); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -233,6 +247,22 @@
   </div>
 
   <div id="acc-out"><p class="muted" style="margin-top:16px"><span class="spinner"></span>Running the test questions…</p></div>
+
+  <h2 class="section-title" id="custom-title">Test your own documents</h2>
+  <p class="muted" style="margin:0">Write questions about the documents you uploaded and say which document should answer each one. The search runs over all documents, samples included, and we check whether it finds the one you chose.</p>
+  <div id="custom-empty" class="card hidden">
+    <p style="margin:0">You haven't uploaded any documents yet. Add some on the Ask page first, then come back here.</p>
+    <div class="btn-row"><button class="btn primary" type="button" id="go-upload">Go to the Ask page</button></div>
+  </div>
+  <form id="custom-form" class="card hidden">
+    <div id="cases"></div>
+    <div class="btn-row">
+      <button class="btn" type="button" id="add-case">+ Add question</button>
+      <button class="btn primary" type="submit" id="run-custom">Run test</button>
+    </div>
+    <p class="status" id="custom-status" aria-live="polite" style="margin:10px 0 0"></p>
+  </form>
+  <div id="custom-out"></div>
 </div>
 
 <div class="page-drop hidden" id="page-drop"><div>Drop files to add them</div></div>
@@ -264,7 +294,7 @@ document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("cli
   document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
   $("#view-ask").classList.toggle("hidden", b.dataset.view !== "ask");
   $("#view-accuracy").classList.toggle("hidden", b.dataset.view !== "accuracy");
-  if (b.dataset.view === "accuracy" && !accuracyLoaded) loadAccuracy();
+  if (b.dataset.view === "accuracy") { if (!accuracyLoaded) loadAccuracy(); else renderCustom(); }
   window.scrollTo(0, 0);
 }));
 
@@ -301,6 +331,7 @@ document.querySelector(".docs-panel").addEventListener("click", (e) => {
   state.mine = state.mine.filter((d) => d.doc_id !== id);
   state.selected.delete(id);
   saveMine(); renderDocs();
+  if (accuracyLoaded) renderCustom();
 });
 $("#toggle-all").addEventListener("click", () => {
   const all = [...state.samples, ...state.mine];
@@ -326,6 +357,7 @@ async function addFiles(files) {
     // Focus the search on the new uploads by default: deselect the samples.
     state.samples.forEach((s) => state.selected.delete(s.doc_id));
     saveMine(); renderDocs();
+    if (accuracyLoaded) renderCustom();
     status.innerHTML = `<span class="ok">Added ${res.documents.map((d) => esc(d.title)).join(", ")}. Now searching your documents.</span>`;
     $("#q").focus();
   } catch (err) {
@@ -421,17 +453,15 @@ $("#ask-form").addEventListener("submit", (e) => {
 
 /* ================= accuracy ================= */
 const pct = (v) => (v == null ? "–" : `${Math.round(v * 100)}%`);
-const short = (id) => (state.samples.find((d) => d.doc_id === id)?.title || id).replace(/\s*\(synthetic sample\)/, "").replace(/^E-Bike Market Brief - /, "");
-async function loadAccuracy() {
-  try {
-    const r = await api("/eval?k=3");
-    accuracyLoaded = true;
-    $("#n-questions").textContent = r.n;
-    const s = r.summary;
-    $("#acc-out").innerHTML = `
+const docTitle = (id) => [...state.samples, ...state.mine].find((d) => d.doc_id === id)?.title || id;
+const short = (id) => docTitle(id).replace(/\s*\(synthetic sample\)/, "").replace(/^E-Bike Market Brief - /, "");
+
+function renderResults(r, k, { note = "", reportWord = "report" } = {}) {
+  const s = r.summary;
+  return `
       <div class="stats">
-        <div class="stat"><div class="v">${pct(s["hit@1"])}</div><div class="l">Right report ranked first</div><div class="d">Share of questions where the top search result came from the correct report.</div></div>
-        <div class="stat"><div class="v">${pct(s["hit@3"])}</div><div class="l">Right report in the top 3</div><div class="d">Share of questions where the correct report appeared in the first three results.</div></div>
+        <div class="stat"><div class="v">${pct(s["hit@1"])}</div><div class="l">Right ${reportWord} ranked first</div><div class="d">Share of questions where the top search result came from the correct ${reportWord}.</div></div>
+        <div class="stat"><div class="v">${pct(s[`hit@${k}`])}</div><div class="l">Right ${reportWord} in the top ${k}</div><div class="d">Share of questions where the correct ${reportWord} appeared in the first ${k} results.</div></div>
         <div class="stat"><div class="v">${s.mrr == null ? "–" : s.mrr.toFixed(2)}</div><div class="l">Average rank score (MRR)</div><div class="d">1.00 means always first, 0.50 means typically second.</div></div>
       </div>
       <div class="card">
@@ -441,15 +471,108 @@ async function loadAccuracy() {
           <tbody>${r.rows.map((row) => `<tr>
             <td>${esc(row.question)}</td>
             <td>${row.expected.map((d) => esc(short(d))).join(", ")}</td>
-            <td>${row.found_at ? `<span class="pill ${row.found_at === 1 ? "ok" : "err"}">${row.found_at === 1 ? "✓ Position 1" : "Position " + row.found_at}</span>` : `<span class="pill err">Not found</span>`}</td>
+            <td>${row.found_at ? `<span class="pill ${row.found_at === 1 ? "ok" : "err"}">${row.found_at === 1 ? "✓ Position 1" : "Position " + row.found_at}</span>` : `<span class="pill err">Not in top results</span>`}</td>
           </tr>`).join("")}</tbody>
         </table></div>
-        <p class="small faint" style="margin-top:10px">The sample reports are short and synthetic, so a perfect score is expected here. Real collections of long reports are harder, and that's where this check becomes useful.</p>
+        ${note ? `<p class="small faint" style="margin-top:10px">${note}</p>` : ""}
       </div>`;
+}
+
+async function loadAccuracy() {
+  renderCustom();
+  try {
+    const r = await api("/eval?k=3");
+    accuracyLoaded = true;
+    $("#n-questions").textContent = r.n;
+    $("#acc-out").innerHTML = renderResults(r, 3, {
+      note: "The sample reports are short and synthetic, so a perfect score is expected here. Real collections of long reports are harder, and that's where this check becomes useful.",
+    });
   } catch (err) {
     $("#acc-out").innerHTML = `<p class="err" style="margin-top:16px">${esc(err.message)}</p>`;
   }
 }
+
+/* ---------- custom tests on the user's own documents ---------- */
+const CASES = "citedrag-cases";
+let cases = (() => { try { return JSON.parse(sessionStorage.getItem(CASES) || "[]"); } catch { return []; } })();
+const saveCases = () => { try { sessionStorage.setItem(CASES, JSON.stringify(cases)); } catch {} };
+
+function docOptions(selected) {
+  const opt = (d) => `<option value="${esc(d.doc_id)}" ${d.doc_id === selected ? "selected" : ""}>${esc(d.title)}</option>`;
+  return `<optgroup label="Your documents">${state.mine.map(opt).join("")}</optgroup>
+          <optgroup label="Sample reports">${state.samples.map(opt).join("")}</optgroup>`;
+}
+
+function renderCustom() {
+  const has = state.mine.length > 0;
+  $("#custom-empty").classList.toggle("hidden", has);
+  $("#custom-form").classList.toggle("hidden", !has);
+  if (!has) { $("#custom-out").innerHTML = ""; return; }
+  const valid = new Set([...state.mine, ...state.samples].map((d) => d.doc_id));
+  cases = cases.filter((c) => valid.has(c.expected_doc));
+  if (!cases.length) cases = [{ question: "", expected_doc: state.mine[0].doc_id }];
+  $("#cases").innerHTML = cases.map((c, i) => `
+    <div class="case" data-i="${i}">
+      <span class="idx">${i + 1}</span>
+      <input type="text" data-field="question" value="${esc(c.question)}" placeholder="e.g. What was the average price in 2025?" aria-label="Test question ${i + 1}" maxlength="2000" />
+      <select data-field="expected_doc" aria-label="Document that should answer question ${i + 1}">${docOptions(c.expected_doc)}</select>
+      <button type="button" class="x" data-remove-case="${i}" aria-label="Remove question ${i + 1}" title="Remove" ${cases.length === 1 ? "disabled" : ""}>×</button>
+    </div>`).join("");
+  saveCases();
+}
+
+$("#cases").addEventListener("input", (e) => {
+  const row = e.target.closest(".case"); if (!row) return;
+  cases[+row.dataset.i][e.target.dataset.field] = e.target.value; saveCases();
+});
+$("#cases").addEventListener("change", (e) => {
+  const row = e.target.closest(".case"); if (!row) return;
+  cases[+row.dataset.i][e.target.dataset.field] = e.target.value; saveCases();
+});
+$("#cases").addEventListener("click", (e) => {
+  const i = e.target.dataset && e.target.dataset.removeCase;
+  if (i === undefined) return;
+  cases.splice(+i, 1); renderCustom();
+});
+$("#add-case").addEventListener("click", () => {
+  if (cases.length >= 50) return;
+  const last = cases[cases.length - 1];
+  cases.push({ question: "", expected_doc: last ? last.expected_doc : state.mine[0].doc_id });
+  renderCustom();
+  const inputs = document.querySelectorAll('#cases input[data-field="question"]');
+  inputs[inputs.length - 1].focus();
+});
+$("#go-upload").addEventListener("click", () => document.querySelector('.tabs button[data-view="ask"]').click());
+
+$("#custom-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const ready = cases.filter((c) => c.question.trim().length >= 3);
+  const status = $("#custom-status");
+  if (!ready.length) { status.innerHTML = `<span class="err">Write at least one question (3+ characters).</span>`; return; }
+  const btn = $("#run-custom");
+  btn.disabled = true;
+  status.innerHTML = `<span class="spinner"></span>Running ${ready.length} question${ready.length === 1 ? "" : "s"}…`;
+  try {
+    const r = await api("/eval/custom", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        k: 3,
+        cases: ready.map((c) => ({ question: c.question.trim(), expected_doc: c.expected_doc })),
+        user_chunks: state.mine.flatMap((d) => d.chunk_list),
+      }),
+    });
+    status.textContent = "";
+    $("#custom-out").innerHTML = renderResults(r, 3, {
+      reportWord: "document",
+      note: "Searched across all your documents and the sample reports. A miss usually means the question uses different words from the document. Try rephrasing it, or check the passages shown on the Ask page.",
+    });
+    $("#custom-out").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    status.innerHTML = `<span class="err">${esc(err.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 /* ================= boot ================= */
 (async () => {

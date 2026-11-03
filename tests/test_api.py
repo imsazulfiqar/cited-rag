@@ -85,3 +85,24 @@ def test_rate_limit(client):
         assert codes == [200, 200, 429]
     finally:
         object.__setattr__(api.settings, "ask_limit_per_hour", 0)
+
+
+def test_custom_eval_on_own_documents(client):
+    doc = client.post("/parse", files=[("files", ("spain.md", io.BytesIO(SPAIN), "text/markdown"))]).json()["documents"][0]
+    r = client.post("/eval/custom", json={
+        "k": 3,
+        "cases": [
+            {"question": "What was the average price in Spain?", "expected_doc": "upload-spain"},
+            {"question": "UK motor power rules", "expected_doc": "ebike_uk_2026"},
+        ],
+        "user_chunks": doc["chunk_list"],
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["n"] == 2 and body["summary"]["hit@1"] == 1.0
+    assert body["rows"][0]["found_at"] == 1 and body["rows"][0]["expected"] == ["upload-spain"]
+
+
+def test_custom_eval_rejects_unknown_document(client):
+    r = client.post("/eval/custom", json={"cases": [{"question": "price?", "expected_doc": "upload-gone"}]})
+    assert r.status_code == 400 and "Re-upload" in r.json()["detail"]

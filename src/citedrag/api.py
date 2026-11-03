@@ -6,6 +6,7 @@ POST /parse         turn uploaded files into chunks (nothing is stored on the se
 POST /ask           cited answer, searching selected sample docs + the user's own uploaded chunks
 GET  /examples      sample questions
 GET  /eval          retrieval accuracy on the golden question set (no model calls)
+POST /eval/custom   retrieval accuracy on the user's own test questions and documents
 
 Uploaded documents are never saved on the server. /parse returns their chunks
 to the browser, which keeps them for the session and sends them with each
@@ -61,6 +62,17 @@ class AskRequest(BaseModel):
     k: int = Field(default=settings.top_k, ge=1, le=20)
     # Which documents to search. None = all built-in samples plus every uploaded doc.
     doc_ids: list[str] | None = Field(default=None, max_length=500)
+    user_chunks: list[ChunkIn] = Field(default_factory=list, max_length=MAX_USER_CHUNKS)
+
+
+class TestCase(BaseModel):
+    question: str = Field(min_length=3, max_length=2000)
+    expected_doc: str = Field(min_length=1, max_length=200)
+
+
+class CustomEvalRequest(BaseModel):
+    cases: list[TestCase] = Field(min_length=1, max_length=50)
+    k: int = Field(default=3, ge=1, le=20)
     user_chunks: list[ChunkIn] = Field(default_factory=list, max_length=MAX_USER_CHUNKS)
 
 
@@ -131,6 +143,22 @@ def evaluate(k: int = 3) -> dict:
     if not path.exists():
         raise HTTPException(404, "No golden question set found")
     return run_eval(base_retriever(), load_golden(path), k=k)
+
+
+@app.post("/eval/custom")
+def evaluate_custom(req: CustomEvalRequest) -> dict:
+    """Score the search on the user's own questions. Searches every document (samples + uploads),
+    so the other documents act as distractors, exactly like on the Ask page with everything ticked."""
+    base = base_retriever()
+    chunks = base.chunks + [Chunk(**c.model_dump()) for c in req.user_chunks]
+    known = {c.doc_id for c in chunks}
+    unknown = sorted({c.expected_doc for c in req.cases} - known)
+    if unknown:
+        raise HTTPException(400, f"Unknown document: {unknown[0]}. Re-upload it on the Ask page and try again.")
+    retriever = Retriever(chunks) if req.user_chunks else base
+    golden = [{"id": f"t{i + 1}", "question": c.question, "expected_docs": [c.expected_doc]}
+              for i, c in enumerate(req.cases)]
+    return run_eval(retriever, golden, k=req.k)
 
 
 @app.post("/parse")
