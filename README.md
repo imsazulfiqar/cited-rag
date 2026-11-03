@@ -73,18 +73,6 @@ export ANTHROPIC_API_KEY=sk-ant-...  # optional: AI-written answers + LLM judge
 citedrag eval -k 3 --judge
 ```
 
-## Deploy to Vercel
-
-1. Push this repo to GitHub.
-2. On vercel.com: **Add New → Project**, import the repo, keep the defaults and click **Deploy**. Vercel detects the FastAPI app in `app.py`.
-3. Optional: under **Settings → Environment Variables**, add `ANTHROPIC_API_KEY` and redeploy to switch to generative mode.
-
-Notes for the hosted version:
-- Vercel's filesystem is read-only apart from `/tmp`, so the index is rebuilt there on startup. Uploaded files are temporary and disappear when the server instance is recycled. For permanent uploads, store them in Vercel Blob (see the roadmap).
-- To protect your API bill, each visitor is limited to 20 questions per hour on Vercel (`CITEDRAG_ASK_LIMIT`; `0` turns it off). It is a per-instance soft limit, so also set a monthly spend limit in the Anthropic Console.
-
-To use your own documents, put `.md`, `.txt` or `.pdf` files in a folder and run `citedrag ingest path/to/folder`. Add `market:` (or any other `key: value`) front matter to Markdown files to enable tag boosting. Then write questions in `eval/golden.jsonl` in the same format as the examples.
-
 ## API
 
 `POST /ask`
