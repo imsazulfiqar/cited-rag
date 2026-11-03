@@ -1,0 +1,33 @@
+[project]
+name = "citedrag"
+version = "0.1.0"
+description = "Grounded, cited question answering over long documents, with a built-in evaluation suite."
+requires-python = ">=3.10"
+dependencies = [
+  "anthropic>=2.4",
+  "rank-bm25>=0.2.2",
+  "pydantic>=2.6",
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "python-multipart>=0.0.9",
+  "pypdf>=4.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+citedrag = "citedrag.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+citedrag = ["static/*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

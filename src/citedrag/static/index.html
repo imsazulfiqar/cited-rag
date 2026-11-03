@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>citedrag · Cited Document Q&amp;A</title>
+<meta name="description" content="Ask questions about long documents and get answers with citations to the exact source passage." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23000319'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-family='Arial' font-weight='800' font-size='30' fill='%23CBACF9'%3E%E2%80%9D%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #000319; --panel: #0b0e24; --panel-2: #10132e; --border: rgba(255,255,255,.1);
+    --text: #f5f6ff; --muted: #a9adcc; --accent: #cbacf9; --accent-2: #7dd3fc;
+    --good: #86efac; --warn: #fcd34d; --bad: #fca5a5; --mark: rgba(203,172,249,.18);
+    --radius: 16px; --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f7f7fc; --panel: #ffffff; --panel-2: #f0eefb; --border: rgba(20,20,60,.12);
+      --text: #12142b; --muted: #5a5e7d; --accent: #6d3fc4; --accent-2: #0369a1;
+      --good: #15803d; --warn: #a16207; --bad: #b91c1c; --mark: rgba(109,63,196,.12);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.55; }
+  a { color: var(--accent); }
+  button, input, textarea { font: inherit; color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px 64px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 28px 0 20px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 26px;
+          background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #000319; }
+  .brand h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+  .brand p { margin: 0; color: var(--muted); font-size: 13px; }
+  nav { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 4px; }
+  nav button { background: none; border: 0; padding: 8px 14px; border-radius: 9px; cursor: pointer; color: var(--muted); font-size: 14px; }
+  nav button[aria-selected="true"] { background: var(--panel-2); color: var(--text); }
+  nav button:focus-visible, .chip:focus-visible, .btn:focus-visible, sup button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .hidden { display: none !important; }
+
+  /* Ask */
+  .ask-box { display: flex; flex-direction: column; gap: 12px; }
+  textarea { width: 100%; min-height: 84px; resize: vertical; padding: 14px 16px; border-radius: 12px; background: var(--panel-2);
+             border: 1px solid var(--border); outline: none; font-size: 16px; }
+  textarea:focus { border-color: var(--accent); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn { border: 0; border-radius: 10px; padding: 10px 18px; cursor: pointer; font-weight: 600;
+         background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #000319; }
+  .btn:disabled { opacity: .55; cursor: progress; }
+  .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); text-align: left; }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
+  .k { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; margin-left: auto; }
+  .k input { width: 56px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); }
+
+  .results { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
+  @media (max-width: 860px) { .results { grid-template-columns: 1fr; } .k { margin-left: 0; } }
+  .answer { font-size: 16.5px; }
+  .answer p { margin: 0 0 12px; }
+  .answer ul { margin: 0 0 12px; padding-left: 20px; }
+  sup button { border: 0; background: var(--mark); color: var(--accent); border-radius: 6px; padding: 0 5px; margin-left: 2px;
+               font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1.6; }
+  .label { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; font-weight: 600; }
+  .cite { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; transition: border-color .2s, background .2s; }
+  .cite.active { border-color: var(--accent); background: var(--mark); }
+  .cite .src { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .cite blockquote { margin: 0; font-size: 14px; }
+  .num { display: inline-block; min-width: 22px; text-align: center; background: var(--mark); color: var(--accent); border-radius: 6px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+  details { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 12px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  .chunk { font-size: 13px; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+  .chunk:last-child { border-bottom: 0; }
+  .score { font-variant-numeric: tabular-nums; color: var(--accent-2); }
+  .meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 14px; }
+  .error { border-color: var(--bad); color: var(--bad); }
+  .empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+
+  .dots span { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; background: var(--accent); animation: b 1s infinite ease-in-out; }
+  .dots span:nth-child(2) { animation-delay: .15s; } .dots span:nth-child(3) { animation-delay: .3s; }
+  @keyframes b { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+  @media (prefers-reduced-motion: reduce) { .dots span { animation: none; opacity: .7; } }
+
+  /* Documents */
+  .docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 16px; }
+  .doc h3 { margin: 0 0 6px; font-size: 15px; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .tag { font-size: 12px; background: var(--panel-2); border-radius: 6px; padding: 2px 8px; color: var(--accent); }
+  .drop { display: block; border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 28px 16px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; }
+  .drop.over, .drop:hover { border-color: var(--accent); background: var(--mark); }
+  .drop input { display: none; }
+
+  /* Eval */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+  .stat .v { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 13px; color: var(--muted); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  td.n { font-variant-numeric: tabular-nums; }
+  .ok { color: var(--good); } .miss { color: var(--bad); }
+
+  footer { margin-top: 40px; text-align: center; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true">”</div>
+      <div>
+        <h1>citedrag</h1>
+        <p>Answers from your documents, with a citation for every claim</p>
+      </div>
+    </div>
+    <nav role="tablist" aria-label="Sections">
+      <button role="tab" aria-selected="true" data-tab="ask">Ask</button>
+      <button role="tab" aria-selected="false" data-tab="docs">Documents</button>
+      <button role="tab" aria-selected="false" data-tab="eval">Evaluation</button>
+    </nav>
+  </header>
+
+  <!-- ASK -->
+  <section id="tab-ask" role="tabpanel">
+    <form class="panel ask-box" id="ask-form">
+      <label for="q" class="label">Ask a question</label>
+      <textarea id="q" placeholder="e.g. What is the biggest barrier to buying an e-bike in the UK?" required minlength="3" maxlength="2000"></textarea>
+      <div class="row">
+        <div class="chips" id="examples" aria-label="Example questions"></div>
+      </div>
+      <div class="row">
+        <button class="btn" type="submit" id="ask-btn">Ask</button>
+        <span class="small muted">Ctrl/⌘ + Enter</span>
+        <label class="k" title="How many passages to retrieve">Passages <input id="k" type="number" min="1" max="20" value="5" /></label>
+      </div>
+    </form>
+
+    <div id="mode-note" class="panel small hidden" style="margin-top:12px"></div>
+    <div id="ask-empty" class="empty">Ask anything about the indexed documents. Click a citation number to see the passage it came from.</div>
+    <div id="ask-loading" class="panel hidden" style="margin-top:16px" aria-live="polite">
+      <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span class="muted">Searching the documents and writing a cited answer…</span>
+    </div>
+    <div id="ask-error" class="panel error hidden" style="margin-top:16px" role="alert"></div>
+
+    <div id="ask-result" class="results hidden">
+      <article class="panel">
+        <p class="label">Answer</p>
+        <div class="answer" id="answer" aria-live="polite"></div>
+        <div class="meta" id="answer-meta"></div>
+      </article>
+      <aside class="panel">
+        <p class="label">Sources</p>
+        <div id="citations"></div>
+        <details>
+          <summary>Retrieved passages (<span id="retrieved-count">0</span>)</summary>
+          <div id="retrieved"></div>
+        </details>
+      </aside>
+    </div>
+  </section>
+
+  <!-- DOCUMENTS -->
+  <section id="tab-docs" role="tabpanel" class="hidden">
+    <label class="drop panel" id="drop">
+      <input type="file" id="file" multiple accept=".md,.txt,.pdf" />
+      <strong>Add documents</strong>
+      <div class="small muted">Drop .pdf, .md or .txt files here, or click to choose (max 20 MB each)</div>
+      <div class="small" id="upload-status" aria-live="polite" style="margin-top:8px"></div>
+    </label>
+    <p class="small muted" id="upload-note"></p>
+    <div class="docs" id="docs"></div>
+  </section>
+
+  <!-- EVAL -->
+  <section id="tab-eval" role="tabpanel" class="hidden">
+    <div class="panel">
+      <p class="label">Retrieval evaluation</p>
+      <p class="muted" style="margin-top:0">Runs the golden question set and checks whether the right document is retrieved. No model calls, so it's free and instant. Use it to compare retrieval changes with numbers.</p>
+      <div class="row">
+        <button class="btn" id="eval-btn">Run evaluation</button>
+        <label class="k" style="margin-left:0">top-k <input id="eval-k" type="number" min="1" max="20" value="3" /></label>
+      </div>
+      <div id="eval-out"></div>
+    </div>
+  </section>
+
+  <footer>
+    Built with FastAPI, BM25 retrieval and Claude's citations API ·
+    <a href="/docs">API docs</a>
+  </footer>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, opts);
+  let body = null;
+  try { body = await res.json(); } catch { /* non-JSON */ }
+  if (!res.ok) throw new Error((body && body.detail) || `Request failed (${res.status})`);
+  return body;
+}
+
+/* ---------- tabs ---------- */
+const loaded = {};
+document.querySelectorAll("nav button").forEach((btn) => btn.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach((b) => b.setAttribute("aria-selected", b === btn));
+  document.querySelectorAll("[role=tabpanel]").forEach((p) => p.classList.add("hidden"));
+  $(`#tab-${btn.dataset.tab}`).classList.remove("hidden");
+  if (btn.dataset.tab === "docs" && !loaded.docs) loadDocs();
+}));
+
+/* ---------- ask ---------- */
+function renderAnswer(text) {
+  // Minimal markdown: paragraphs, bullet lists, **bold**; citation markers become buttons.
+  const blocks = esc(text).split(/\n{2,}/);
+  return blocks.map((b) => {
+    let html = b.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+                .replace(/\[(\d+)\]/g, '<sup><button type="button" data-cite="$1" aria-label="Show source $1">$1</button></sup>');
+    const lines = html.split("\n");
+    if (lines.every((l) => /^\s*[-*•]\s+/.test(l))) {
+      return "<ul>" + lines.map((l) => `<li>${l.replace(/^\s*[-*•]\s+/, "")}</li>`).join("") + "</ul>";
+    }
+    return `<p>${lines.join("<br>")}</p>`;
+  }).join("");
+}
+
+function showCitation(n) {
+  document.querySelectorAll(".cite").forEach((c) => c.classList.toggle("active", c.dataset.n === String(n)));
+  const el = document.querySelector(`.cite[data-n="${n}"]`);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+$("#answer").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-cite]");
+  if (b) showCitation(b.dataset.cite);
+});
+
+async function ask(question) {
+  const btn = $("#ask-btn");
+  btn.disabled = true;
+  ["#ask-empty", "#ask-error", "#ask-result"].forEach((s) => $(s).classList.add("hidden"));
+  $("#ask-loading").classList.remove("hidden");
+  try {
+    const k = Math.min(20, Math.max(1, parseInt($("#k").value, 10) || 5));
+    const data = await api("/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, k }) });
+    $("#answer").innerHTML = renderAnswer(data.answer);
+    $("#citations").innerHTML = data.citations.length
+      ? data.citations.map((c) => `
+          <div class="cite" data-n="${c.number}">
+            <div class="src"><span class="num">${c.number}</span>${esc(c.label)}</div>
+            <blockquote>“${esc(c.quote)}”</blockquote>
+          </div>`).join("")
+      : `<p class="muted small">No citations: the documents didn't support an answer.</p>`;
+    $("#retrieved-count").textContent = data.retrieved.length;
+    $("#retrieved").innerHTML = data.retrieved.map((r) => `
+      <div class="chunk"><div><strong>${esc(r.label)}</strong> · score <span class="score">${r.score.toFixed(2)}</span></div>
+      <div class="muted">${esc(r.text.slice(0, 260))}${r.text.length > 260 ? "…" : ""}</div></div>`).join("");
+    $("#answer-meta").innerHTML = [
+      data.mode === "extractive" ? "Extractive mode: quoted directly from the documents" : (data.model && `Model: ${esc(data.model)}`),
+      `${data.citations.length} citation${data.citations.length === 1 ? "" : "s"}`,
+      data.refused && `<span class="miss">Declined by safety filters</span>`,
+    ].filter(Boolean).map((m) => `<span>${m}</span>`).join("");
+    $("#ask-result").classList.remove("hidden");
+  } catch (err) {
+    $("#ask-error").textContent = err.message;
+    $("#ask-error").classList.remove("hidden");
+  } finally {
+    $("#ask-loading").classList.add("hidden");
+    btn.disabled = false;
+  }
+}
+
+$("#ask-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const q = $("#q").value.trim();
+  if (q.length >= 3) ask(q);
+});
+$("#q").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("#ask-form").requestSubmit();
+});
+
+api("/examples").then((qs) => {
+  $("#examples").innerHTML = qs.map((q) => `<button type="button" class="chip">${esc(q)}</button>`).join("");
+  $("#examples").querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => { $("#q").value = c.textContent; ask(c.textContent); }));
+}).catch(() => {});
+
+/* ---------- documents ---------- */
+async function loadDocs() {
+  try {
+    const docs = await api("/documents");
+    loaded.docs = true;
+    $("#docs").innerHTML = docs.map((d) => `
+      <div class="panel doc">
+        <h3>${esc(d.title)}</h3>
+        <div class="small muted">${d.chunks} passage${d.chunks === 1 ? "" : "s"} · ${esc(d.doc_id)}</div>
+        <div class="tags">${Object.entries(d.tags || {}).map(([k, v]) => `<span class="tag">${esc(k)}: ${esc(v)}</span>`).join("")}</div>
+      </div>`).join("") || `<p class="muted">No documents indexed yet.</p>`;
+  } catch (err) {
+    $("#docs").innerHTML = `<p class="miss">${esc(err.message)}</p>`;
+  }
+}
+
+async function upload(files) {
+  if (!files.length) return;
+  const fd = new FormData();
+  [...files].forEach((f) => fd.append("files", f));
+  $("#upload-status").textContent = `Uploading ${files.length} file${files.length === 1 ? "" : "s"}…`;
+  try {
+    const res = await api("/upload", { method: "POST", body: fd });
+    $("#upload-status").innerHTML = `<span class="ok">Added ${res.saved.map(esc).join(", ")}. Index now has ${res.chunks} passages.</span>`;
+    loadDocs();
+  } catch (err) {
+    $("#upload-status").innerHTML = `<span class="miss">${esc(err.message)}</span>`;
+  }
+}
+$("#file").addEventListener("change", (e) => upload(e.target.files));
+const drop = $("#drop");
+["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => upload(e.dataTransfer.files));
+
+api("/config").then((c) => {
+  if (c.mode === "extractive") {
+    $("#mode-note").innerHTML = "<strong>Extractive mode.</strong> <span class='muted'>No AI model is connected, so answers are the most relevant sentences quoted straight from the documents, each with its citation.</span>";
+    $("#mode-note").classList.remove("hidden");
+  }
+  if (c.ephemeral_uploads) $("#upload-note").textContent = "Demo note: uploaded files are temporary in this hosted demo and may disappear after a few minutes of inactivity.";
+}).catch(() => {});
+
+/* ---------- eval ---------- */
+const pct = (v) => (v == null ? "–" : `${Math.round(v * 100)}%`);
+$("#eval-btn").addEventListener("click", async () => {
+  const k = Math.min(20, Math.max(1, parseInt($("#eval-k").value, 10) || 3));
+  $("#eval-out").innerHTML = `<p class="muted">Running…</p>`;
+  try {
+    const r = await api(`/eval?k=${k}`);
+    const s = r.summary;
+    $("#eval-out").innerHTML = `
+      <div class="stats">
+        <div class="panel stat"><div class="v">${pct(s["hit@1"])}</div><div class="l">Right document ranked first (hit@1)</div></div>
+        <div class="panel stat"><div class="v">${pct(s[`hit@${k}`])}</div><div class="l">Right document in top ${k} (hit@${k})</div></div>
+        <div class="panel stat"><div class="v">${s.mrr == null ? "–" : s.mrr.toFixed(2)}</div><div class="l">Mean reciprocal rank</div></div>
+        <div class="panel stat"><div class="v">${r.n}</div><div class="l">Questions in the golden set</div></div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Question</th><th>hit@1</th><th>MRR</th><th>Top results</th></tr></thead>
+        <tbody>${r.rows.map((row) => `<tr>
+          <td>${esc(row.question)}</td>
+          <td class="n ${row["hit@1"] ? "ok" : "miss"}">${row["hit@1"] ? "✓" : "✗"}</td>
+          <td class="n">${row.mrr.toFixed(2)}</td>
+          <td class="small muted">${row.retrieved.slice(0, 3).map(esc).join("<br>")}</td></tr>`).join("")}
+        </tbody></table></div>`;
+  } catch (err) {
+    $("#eval-out").innerHTML = `<p class="miss">${esc(err.message)}</p>`;
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{"id": "q1", "question": "How many e-bikes were sold in the UK in 2025?", "expected_docs": ["ebike_uk_2026"], "reference_answer": "About 410,000 units, up 9% year on year."}
+{"id": "q2", "question": "What was the average selling price of e-bikes in Germany?", "expected_docs": ["ebike_germany_2026"], "reference_answer": "About €2,950 in 2025, broadly stable year on year."}
+{"id": "q3", "question": "What is the biggest barrier to buying an e-bike in the UK?", "expected_docs": ["ebike_uk_2026"], "reference_answer": "Fear of theft (47%), ahead of upfront cost (41%)."}
+{"id": "q4", "question": "What is the biggest purchase barrier in France?", "expected_docs": ["ebike_france_2026"], "reference_answer": "Upfront cost (49%), followed by theft (38%)."}
+{"id": "q5", "question": "Which market has the highest share of cargo bikes?", "expected_docs": ["ebike_france_2026"], "reference_answer": "France, with cargo bikes at 13% of units."}
+{"id": "q6", "question": "How important is employer leasing for e-bike sales in Germany?", "expected_docs": ["ebike_germany_2026"], "reference_answer": "Employer leasing (Dienstrad-Leasing) is used for about 40% of new purchases and supports higher-priced models."}
+{"id": "q7", "question": "What are the motor power rules for e-bikes in the UK?", "expected_docs": ["ebike_uk_2026"], "reference_answer": "Motors are limited to 250W, with assistance cutting out at 15.5 mph."}
+{"id": "q8", "question": "How do subsidies affect e-bike prices in France?", "expected_docs": ["ebike_france_2026"], "reference_answer": "National and regional subsidies reduce the effective price, especially for lower-income households and cargo bikes."}
+{"id": "q9", "question": "What share of German e-bike sales go through specialist retailers?", "expected_docs": ["ebike_germany_2026"], "reference_answer": "Around 70% of sales by value."}
+{"id": "q10", "question": "What drives commuter e-bike demand in French cities?", "expected_docs": ["ebike_france_2026"], "reference_answer": "Investment in protected cycle lanes in cities such as Paris, Lyon and Grenoble."}
