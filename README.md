@@ -4,25 +4,15 @@
 
 Analysts often have to dig answers out of long, dense reports. A plain chatbot over those reports is risky: it can blend markets together, invent figures, and give no way to check where an answer came from. `citedrag` answers questions only from the documents, cites the exact passage behind every claim, and includes an evaluation harness. The harness shows whether a change to the pipeline actually improved quality. A mini public version of RAG tool I built at work: ask questions about long reports and get answers that cite the exact passage they came from, plus an evaluation suite to check retrieval quality.
 
-Example of the output format:
+## What citedrag does?
 
-```text
-$ citedrag ask "What is the biggest barrier to buying an e-bike in the UK?"
+citedrag answers questions about documents and shows where every answer came from.
 
-The most cited barrier among UK non-owners is fear of theft (47%)[1], ahead of upfront cost (41%) and lack of secure storage at home (33%)[1].
+1. You upload documents (PDF, Markdown or text) or use the three sample market reports.
+2. You ask a question in plain English, e.g. “What’s the biggest barrier to buying an e-bike in the UK?”
+3. It finds the most relevant passages and gives you an answer with numbered citations. Click a number to see the exact sentence it came from.
+4. The “How accurate is it?” page measures how well the search finds the right document, using test questions with known answers. You can also write test questions for your own documents.
 
-[1] E-Bike Market Brief - United Kingdom 2026 (Consumer barriers): "The most cited barrier to purchase among UK non-owners was fear of theft (47%)..."
-```
-
-## Web app
-
-A web interface is served at `/` with two pages.
-
-**Ask**
-- A **Documents** panel lists the sample reports and anything you add. Add `.pdf`, `.md` or `.txt` files from the panel, with the paperclip button next to the question box, or by dragging them anywhere onto the page.
-- Tick or untick documents to choose what gets searched.
-- Uploaded files stay in your browser tab and are sent along with each question. They are never stored on the server.
-- Questions and answers stack up like a conversation. Click a citation number to highlight the quoted passage it came from, or expand the list of every passage that was searched.
 
 **How accurate is it?**
 - Explains in plain language what is being measured. Ten test questions, each with a known source report, are run through the same search the Ask page uses.
@@ -82,9 +72,7 @@ citedrag eval -k 3 --judge
 Notes for the hosted version:
 - Vercel's filesystem is read-only apart from `/tmp`, so the sample index is rebuilt there on startup.
 - Uploaded documents are kept in each visitor's browser, not on the server. They stay private to that visitor and work fine on serverless hosting. Files are limited to 4 MB each because Vercel caps request bodies at 4.5 MB.
-- To protect your API bill, each visitor is limited to 20 questions per hour on Vercel (`CITEDRAG_ASK_LIMIT`; `0` turns it off). It is a per-instance soft limit, so also set a monthly spend limit in the Anthropic Console.
-
-To use your own documents, put `.md`, `.txt` or `.pdf` files in a folder and run `citedrag ingest path/to/folder`. Add `market:` (or any other `key: value`) front matter to Markdown files to enable tag boosting. Then write questions in `eval/golden.jsonl` in the same format as the examples.
+- To use your own documents, put `.md`, `.txt` or `.pdf` files in a folder and run `citedrag ingest path/to/folder`. Add `market:` (or any other `key: value`) front matter to Markdown files to enable tag boosting. Then write questions in `eval/golden.jsonl` in the same format as the examples.
 
 ## API
 
@@ -115,8 +103,6 @@ The `/ask` response contains the answer, numbered citations (chunk id, label and
 | hit@3 | 1.0 |
 | MRR | 1.0 |
 
-_The sample corpus is three short **synthetic** market briefs written for this repo, so these numbers only show the pipeline working. Run it on a real corpus for meaningful numbers._
-
 ## Tests
 
 ```bash
@@ -124,15 +110,3 @@ pytest -q
 ```
 
 The tests cover normalisation, chunking, market-aware retrieval, the metrics, citation rendering, extractive mode and every API endpoint, including parsing uploaded files, asking about your own documents, document filtering and the rate limit. Model calls are stubbed, so the tests run without an API key. CI runs them on every push.
-
-## Design notes
-
-- **Model:** `claude-opus-5-5` by default, configurable with `CITEDRAG_MODEL`. Reasoning effort is set explicitly to `medium` for Q&A and `low` for the judge.
-- **Safety refusals:** requests opt in to server-side fallbacks (`fallbacks="default"`), and a `refusal` stop reason is handled before the response content is read.
-- **No vector database required:** BM25 keeps the project dependency-light and works well on terminology-heavy text. Dense retrieval is the obvious next step, and the eval harness is how you would show that it helps.
-
-## Roadmap
-
-- [ ] Hybrid retrieval (BM25 + embeddings) with reciprocal rank fusion, compared on the eval set
-- [ ] OCR for tables and charts in scanned PDFs
-- [ ] Streamed answers in the web app
